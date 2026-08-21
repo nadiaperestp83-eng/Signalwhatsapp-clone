@@ -4,13 +4,15 @@ import 'package:whatsapp_clone/screens/chats/components/widgets/chat_screen/chat
 
 class ChatScreen extends StatelessWidget {
   static String routeName = '/chat-screen';
-  const ChatScreen({super.key});
+  final String targetUserId;
+
+  const ChatScreen({super.key, required this.targetUserId});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: chatScreenAppBar(),
-      body: const ChatScreenBody()
+      body: ChatScreenBody(targetUserId: targetUserId),
     );
   }
 }
