@@ -1,11 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
+import 'package:whatsapp_clone/core/signal_core.dart';
 
+class SendMessageAndRecordAudioWidget extends StatefulWidget {
+  final String targetUserId;
 
-class SendMessageAndRecordAudioWidget extends StatelessWidget {
   const SendMessageAndRecordAudioWidget({
     super.key,
+    required this.targetUserId,
   });
+
+  @override
+  State<SendMessageAndRecordAudioWidget> createState() =>
+      _SendMessageAndRecordAudioWidgetState();
+}
+
+class _SendMessageAndRecordAudioWidgetState
+    extends State<SendMessageAndRecordAudioWidget> {
+  final TextEditingController _controller = TextEditingController();
+  bool _temTexto = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final temTexto = _controller.text.trim().isNotEmpty;
+      if (temTexto != _temTexto) {
+        setState(() => _temTexto = temTexto);
+      }
+    });
+  }
+
+  Future<void> _enviar() async {
+    final texto = _controller.text.trim();
+    if (texto.isEmpty) return;
+
+    try {
+      await SignalCore().enviarMensagemSegura(widget.targetUserId, texto);
+      _controller.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao enviar mensagem segura: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,12 +71,14 @@ class SendMessageAndRecordAudioWidget extends StatelessWidget {
               ),
               SizedBox(
                 width: MediaQuery.of(context).size.width * .47,
-                child: const TextField(
-                  decoration: InputDecoration(
+                child: TextField(
+                  controller: _controller,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _enviar(),
+                  decoration: const InputDecoration(
                     border: InputBorder.none,
                     hintStyle: TextStyle(color: kTextDarkColor),
                     hintText: 'Message',
-                    
                   ),
                 ),
               ),
@@ -48,11 +96,14 @@ class SendMessageAndRecordAudioWidget extends StatelessWidget {
         Container(
           decoration: const BoxDecoration(
             color: kPrimaryColor,
-            shape: BoxShape.circle
+            shape: BoxShape.circle,
           ),
           child: IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.mic, color: Colors.black),
+            onPressed: _temTexto ? _enviar : () {},
+            icon: Icon(
+              _temTexto ? Icons.send : Icons.mic,
+              color: Colors.black,
+            ),
           ),
         ),
       ],
