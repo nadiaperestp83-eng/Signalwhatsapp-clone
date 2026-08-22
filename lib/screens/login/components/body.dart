@@ -19,6 +19,10 @@ class LoginScreenBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final telefoneCompleto = selectedCountryCode != null
+        ? '+$selectedCountryCode${mobileNumberController.text.trim()}'
+        : '';
+
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -28,7 +32,7 @@ class LoginScreenBody extends StatelessWidget {
           const SizedBox(height: 20.0),
           MobileNumberInputField(mobileNumberController: mobileNumberController, countryCode: selectedCountryCode),
           SizedBox(height: MediaQuery.of(context).size.height * .58),
-          const NextButton(),
+          NextButton(telefoneCompleto: telefoneCompleto),
         ],
       ),
     );
