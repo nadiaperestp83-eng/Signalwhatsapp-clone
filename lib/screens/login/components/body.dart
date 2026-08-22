@@ -11,11 +11,13 @@ class LoginScreenBody extends StatelessWidget {
     required this.mobileNumberController,
     required this.selectCountry,
     required this.selectedCountryCode,
+    required this.onNumberChanged,
   });
 
   final TextEditingController mobileNumberController;
   final void Function() selectCountry;
   final String? selectedCountryCode;
+  final void Function(String) onNumberChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +32,11 @@ class LoginScreenBody extends StatelessWidget {
           const SizedBox(height: 10.0),
           SelectCountryButton(selectCountry: selectCountry),
           const SizedBox(height: 20.0),
-          MobileNumberInputField(mobileNumberController: mobileNumberController, countryCode: selectedCountryCode),
+          MobileNumberInputField(
+            mobileNumberController: mobileNumberController,
+            countryCode: selectedCountryCode,
+            onChanged: onNumberChanged,
+          ),
           SizedBox(height: MediaQuery.of(context).size.height * .58),
           NextButton(telefoneCompleto: telefoneCompleto),
         ],
