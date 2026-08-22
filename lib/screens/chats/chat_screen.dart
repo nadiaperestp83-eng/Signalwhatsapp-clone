@@ -4,12 +4,12 @@ import 'package:whatsapp_clone/screens/chats/components/widgets/chat_screen/chat
 
 class ChatScreen extends StatelessWidget {
   static String routeName = '/chat-screen';
-  final String targetUserId;
-
-  const ChatScreen({super.key, required this.targetUserId});
+  const ChatScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final targetUserId = ModalRoute.of(context)?.settings.arguments as String? ?? '';
+
     return Scaffold(
       appBar: chatScreenAppBar(),
       body: ChatScreenBody(targetUserId: targetUserId),
