@@ -7,10 +7,12 @@ class MobileNumberInputField extends StatelessWidget {
     super.key,
     required this.mobileNumberController,
     required this.countryCode,
+    required this.onChanged,
   });
 
   final TextEditingController mobileNumberController;
   final String? countryCode;
+  final void Function(String) onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +26,7 @@ class MobileNumberInputField extends StatelessWidget {
               color: Colors.grey.withOpacity(.4),
             ),
             child: Text(
-              countryCode == null ? '+1' : '+$countryCode',  // if country code is null display '+1' else display the country code
+              countryCode == null ? '+1' : '+$countryCode',
               style: const TextStyle(color: kTextColor)
             ),
           ),
@@ -33,6 +35,7 @@ class MobileNumberInputField extends StatelessWidget {
             width: MediaQuery.of(context).size.width * .7,
             child: TextField(
               controller: mobileNumberController,
+              onChanged: onChanged,
               decoration: const InputDecoration(
                 hintText: 'phone number',
                 hintStyle: TextStyle(color: Colors.grey),
