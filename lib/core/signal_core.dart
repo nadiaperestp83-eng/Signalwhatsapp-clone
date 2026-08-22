@@ -130,15 +130,16 @@ class SignalCore {
     final preKeyResult =
         await _supabase.rpc('consume_one_time_prekey', params: {'target_user_id': userId});
 
-    int? preKeyId;
-    ECPublicKey? preKeyPublic;
-    if (preKeyResult is List && preKeyResult.isNotEmpty) {
-      preKeyId = preKeyResult.first['pre_key_id'] as int?;
-      final preKeyPublicB64 = preKeyResult.first['pre_key_public'] as String?;
-      if (preKeyPublicB64 != null) {
-        preKeyPublic = Curve.decodePoint(base64Decode(preKeyPublicB64), 0);
-      }
+    if (preKeyResult is! List || preKeyResult.isEmpty) {
+      throw StateError(
+        'Usuário $userId está sem one-time prekeys disponíveis no momento. '
+        'Ele precisa reabrir o app pra repor o lote.',
+      );
     }
+
+    final preKeyId = preKeyResult.first['pre_key_id'] as int;
+    final preKeyPublicB64 = preKeyResult.first['pre_key_public'] as String;
+    final preKeyPublic = Curve.decodePoint(base64Decode(preKeyPublicB64), 0);
 
     final identityKey =
         IdentityKey(Curve.decodePoint(base64Decode(bundleRow['identity_key']), 0));
@@ -211,21 +212,16 @@ class SignalCore {
         address,
       );
 
-      final completer = Completer<Uint8List>();
+      Uint8List textoPlanoBytes;
 
       if (payloadTipo == CiphertextMessage.prekeyType) {
         final mensagem = PreKeySignalMessage(payloadBytes);
-        await sessionCipher.decryptWithCallback(mensagem, (plaintext) {
-          completer.complete(plaintext);
-        });
+        textoPlanoBytes = await sessionCipher.decrypt(mensagem);
       } else {
         final mensagem = SignalMessage.fromSerialized(payloadBytes);
-        await sessionCipher.decryptWithCallback(mensagem, (plaintext) {
-          completer.complete(plaintext);
-        });
+        textoPlanoBytes = await sessionCipher.decryptFromSignal(mensagem);
       }
 
-      final textoPlanoBytes = await completer.future;
       _sessoesEstabelecidas.add(remetente);
 
       _streamController.add(
