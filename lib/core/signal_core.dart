@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:libsignal/libsignal.dart';
+import 'package:libsignal_protocol_dart/libsignal_protocol_dart.dart';
 
 class MensagemDescriptografada {
   final String remetente;
@@ -43,24 +43,23 @@ class SignalCore {
   Stream<MensagemDescriptografada> get mensagensRecebidas => _streamController.stream;
   bool get estaInicializado => _inicializado;
 
-  /// Chame isso DEPOIS de Supabase.initialize() no main.dart e depois do login.
+  /// Chame DEPOIS de Supabase.initialize() no main.dart e depois do login.
   Future<void> inicializarCasulo({required String meuUserId}) async {
     if (_inicializado) return;
     _meuUserId = meuUserId;
     _supabase = Supabase.instance.client;
 
-    _identityKeyPair = IdentityKeyPair.generate();
+    _identityKeyPair = generateIdentityKeyPair();
     _registrationId = generateRegistrationId(false);
     _identityKeyStore = InMemoryIdentityKeyStore(_identityKeyPair, _registrationId);
 
-    final signedPreKeyId = Random.secure().nextInt(0xFFFFFF);
-    _signedPreKey = generateSignedPreKey(_identityKeyPair, signedPreKeyId);
-    _signedPreKeyStore.storeSignedPreKey(signedPreKeyId, _signedPreKey);
-
     final preKeys = generatePreKeys(0, 100);
-    for (final pk in preKeys) {
-      _preKeyStore.storePreKey(pk.id, pk);
+    _signedPreKey = generateSignedPreKey(_identityKeyPair, 0);
+
+    for (final p in preKeys) {
+      await _preKeyStore.storePreKey(p.id, p);
     }
+    await _signedPreKeyStore.storeSignedPreKey(_signedPreKey.id, _signedPreKey);
 
     await _publicarMeuBundle(preKeys);
     _escutarMensagensEntrantes();
@@ -115,8 +114,8 @@ class SignalCore {
   Future<void> _garantirSessao(String userId) async {
     if (_sessoesEstabelecidas.contains(userId)) return;
 
-    final address = ProtocolAddress(userId, 1);
-    if (_sessionStore.containsSession(address)) {
+    final address = SignalProtocolAddress(userId, 1);
+    if (await _sessionStore.containsSession(address)) {
       _sessoesEstabelecidas.add(userId);
       return;
     }
@@ -128,17 +127,21 @@ class SignalCore {
       throw StateError('Usuário $userId ainda não publicou um bundle de chaves.');
     }
 
-    final preKeyResult = await _supabase
-        .rpc('consume_one_time_prekey', params: {'target_user_id': userId});
+    final preKeyResult =
+        await _supabase.rpc('consume_one_time_prekey', params: {'target_user_id': userId});
 
     int? preKeyId;
-    String? preKeyPublic;
+    ECPublicKey? preKeyPublic;
     if (preKeyResult is List && preKeyResult.isNotEmpty) {
       preKeyId = preKeyResult.first['pre_key_id'] as int?;
-      preKeyPublic = preKeyResult.first['pre_key_public'] as String?;
+      final preKeyPublicB64 = preKeyResult.first['pre_key_public'] as String?;
+      if (preKeyPublicB64 != null) {
+        preKeyPublic = Curve.decodePoint(base64Decode(preKeyPublicB64), 0);
+      }
     }
 
-    final identityKey = IdentityKey.fromBytes(base64Decode(bundleRow['identity_key']), 0);
+    final identityKey =
+        IdentityKey(Curve.decodePoint(base64Decode(bundleRow['identity_key']), 0));
     final signedPreKeyPublic =
         Curve.decodePoint(base64Decode(bundleRow['signed_pre_key_public']), 0);
     final signedPreKeySignature = base64Decode(bundleRow['signed_pre_key_signature']);
@@ -147,7 +150,7 @@ class SignalCore {
       bundleRow['registration_id'] as int,
       1,
       preKeyId,
-      preKeyId != null ? Curve.decodePoint(base64Decode(preKeyPublic!), 0) : null,
+      preKeyPublic,
       bundleRow['signed_pre_key_id'] as int,
       signedPreKeyPublic,
       signedPreKeySignature,
@@ -162,7 +165,7 @@ class SignalCore {
       address,
     );
 
-    sessionBuilder.processPreKeyBundle(bundle);
+    await sessionBuilder.processPreKeyBundle(bundle);
     _sessoesEstabelecidas.add(userId);
   }
 
@@ -173,16 +176,17 @@ class SignalCore {
 
     await _garantirSessao(numeroDestino);
 
-    final address = ProtocolAddress(numeroDestino, 1);
+    final address = SignalProtocolAddress(numeroDestino, 1);
     final sessionCipher = SessionCipher(
       _sessionStore,
-      _identityKeyStore,
       _preKeyStore,
       _signedPreKeyStore,
+      _identityKeyStore,
       address,
     );
 
-    final ciphertextMessage = await sessionCipher.encrypt(utf8.encode(textoPuro));
+    final ciphertextMessage =
+        await sessionCipher.encrypt(Uint8List.fromList(utf8.encode(textoPuro)));
 
     await _supabase.from('signal_messages').insert({
       'sender_id': _meuUserId,
@@ -195,21 +199,33 @@ class SignalCore {
   Future<void> _processarMensagemEntrante(Map<String, dynamic> row) async {
     try {
       final String remetente = row['sender_id'] as String;
-      final payload = base64Decode(row['payload'] as String);
+      final Uint8List payloadBytes = base64Decode(row['payload'] as String);
+      final int payloadTipo = row['payload_type'] as int;
 
-      final address = ProtocolAddress(remetente, 1);
+      final address = SignalProtocolAddress(remetente, 1);
       final sessionCipher = SessionCipher(
         _sessionStore,
-        _identityKeyStore,
         _preKeyStore,
         _signedPreKeyStore,
+        _identityKeyStore,
         address,
       );
 
-      final textoPlanoBytes = await sessionCipher.decrypt(
-        CiphertextMessage.fromSerialized(payload),
-      );
+      final completer = Completer<Uint8List>();
 
+      if (payloadTipo == CiphertextMessage.prekeyType) {
+        final mensagem = PreKeySignalMessage(payloadBytes);
+        await sessionCipher.decryptWithCallback(mensagem, (plaintext) {
+          completer.complete(plaintext);
+        });
+      } else {
+        final mensagem = SignalMessage.fromSerialized(payloadBytes);
+        await sessionCipher.decryptWithCallback(mensagem, (plaintext) {
+          completer.complete(plaintext);
+        });
+      }
+
+      final textoPlanoBytes = await completer.future;
       _sessoesEstabelecidas.add(remetente);
 
       _streamController.add(
@@ -220,7 +236,6 @@ class SignalCore {
         ),
       );
 
-      // Apaga do Supabase depois de descriptografar — não fica ciphertext acumulado
       await _supabase.from('signal_messages').delete().eq('id', row['id']);
     } catch (e) {
       print('Erro ao processar mensagem entrante: $e');
