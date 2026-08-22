@@ -16,7 +16,7 @@ jobs:
       - name: Instalar Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.9'
+          flutter-version: '3.27.4'
           channel: 'stable'
 
       - name: Instalar dependências
@@ -32,7 +32,7 @@ jobs:
           EOF
 
       - name: Build APK (release)
-        run: flutter build apk --release --dart-define-from-file=secrets.json
+        run: flutter build apk --release --dart-define-from-file=secrets.json --android-skip-build-dependency-validation
 
       - name: Upload do APK gerado
         uses: actions/upload-artifact@v4
