@@ -46,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
         mobileNumberController: mobileNumberController,
         selectCountry: _pickCountry,
         selectedCountryCode: selectCountry?.phoneCode,
+        onNumberChanged: (_) => setState(() {}),
       ),
     );
   }
