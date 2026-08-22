@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
-import 'package:whatsapp_clone/core/signal_core.dart';
+import 'package:whatsapp_clone/core/signal_registration_service.dart';
 import 'package:whatsapp_clone/screens/signup/signup_screen.dart';
+
+const String _signalBridgeUrl = String.fromEnvironment('SIGNAL_BRIDGE_URL');
 
 class OtpInputField extends StatefulWidget {
   const OtpInputField({
@@ -13,24 +15,25 @@ class OtpInputField extends StatefulWidget {
 }
 
 class _OtpInputFieldState extends State<OtpInputField> {
-  bool _inicializando = false;
+  bool _verificando = false;
 
-  Future<void> _verificarEIniciarCasulo(String codigo) async {
-    if (_inicializando) return;
-    setState(() => _inicializando = true);
+  Future<void> _verificarCodigo(String codigo) async {
+    if (_verificando) return;
+    setState(() => _verificando = true);
 
     try {
-      // Assume que a tela anterior (Login) passou o telefone como argumento da rota.
       final telefone = ModalRoute.of(context)?.settings.arguments as String?;
 
       if (telefone == null || telefone.isEmpty) {
-        throw StateError(
-          'Número de telefone não recebido da tela de login. '
-          'Verifique se LoginScreen está passando `arguments: numero` no Navigator.pushNamed.',
-        );
+        throw StateError('Número de telefone não recebido da tela de login.');
       }
 
-      await SignalCore().inicializarCasulo(meuUserId: telefone);
+      final service = SignalRegistrationService(bridgeBaseUrl: _signalBridgeUrl);
+      final resultado = await service.verificar(telefone: telefone, codigo: codigo);
+
+      if (resultado['sucesso'] != true) {
+        throw StateError(resultado['erro']?.toString() ?? 'Código inválido.');
+      }
 
       if (mounted) {
         Navigator.pushNamed(context, SignupScreen.routeName, arguments: telefone);
@@ -38,11 +41,11 @@ class _OtpInputFieldState extends State<OtpInputField> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Falha ao iniciar o Casulo: $e')),
+          SnackBar(content: Text('Falha na verificação: $e')),
         );
       }
     } finally {
-      if (mounted) setState(() => _inicializando = false);
+      if (mounted) setState(() => _verificando = false);
     }
   }
 
@@ -50,7 +53,7 @@ class _OtpInputFieldState extends State<OtpInputField> {
   Widget build(BuildContext context) {
     return SizedBox(
       width: MediaQuery.of(context).size.width * .5,
-      child: _inicializando
+      child: _verificando
           ? const CircularProgressIndicator()
           : TextField(
               decoration: const InputDecoration(
@@ -62,7 +65,7 @@ class _OtpInputFieldState extends State<OtpInputField> {
               textAlign: TextAlign.center,
               onChanged: (value) {
                 if (value.isNotEmpty && value.length >= 6) {
-                  _verificarEIniciarCasulo(value);
+                  _verificarCodigo(value);
                 }
               },
             ),
