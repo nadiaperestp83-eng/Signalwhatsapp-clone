@@ -19,8 +19,11 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
-      - name: Instalar dependências
-        run: flutter pub get
+      - name: Limpar cache e instalar dependências
+        run: |
+          flutter clean
+          flutter pub cache clean --force
+          flutter pub get
 
       - name: Criar secrets.json a partir dos GitHub Secrets
         run: |
