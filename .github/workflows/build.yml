@@ -31,6 +31,12 @@ jobs:
           }
           EOF
 
+      - name: Forçar versão do Kotlin para 1.8+ no projeto Android
+        run: |
+          # Procura onde o kotlin_version é definido e força para 1.8.22 ou superior
+          find . -name "build.gradle" -o -name "build.gradle.kts" | xargs sed -i 's/kotlin_version = .*/kotlin_version = "1.8.22"/g' || true
+          find . -name "build.gradle" -o -name "build.gradle.kts" | xargs sed -i 's/kotlin("jvm") version .*/kotlin("jvm") version "1.8.22"/g' || true
+
       - name: Build APK (release)
         run: flutter build apk --release --dart-define-from-file=secrets.json --android-skip-build-dependency-validation
 
