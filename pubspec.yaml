@@ -20,6 +20,8 @@ dependencies:
   country_picker: ^2.0.26
   flutter_launcher_icons: ^0.13.1
   http: ^1.2.0
+  app_links: ^6.3.1
+
 
 flutter_launcher_icons:
   android: true
