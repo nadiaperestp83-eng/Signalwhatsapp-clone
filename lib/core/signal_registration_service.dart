@@ -9,6 +9,14 @@ class SignalRegistrationService {
             ? bridgeBaseUrl.substring(0, bridgeBaseUrl.length - 1)
             : bridgeBaseUrl;
 
+  Future<bool> jaRegistrado(String telefone) async {
+    final resposta = await http.get(
+      Uri.parse('$bridgeBaseUrl/status?phone=${Uri.encodeComponent(telefone)}'),
+    );
+    final json = jsonDecode(resposta.body) as Map<String, dynamic>;
+    return json['registrado'] == true;
+  }
+
   Future<Map<String, dynamic>> registrar({
     required String telefone,
     String? captchaToken,
