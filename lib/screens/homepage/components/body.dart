@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/core/signal_core.dart';
+import 'package:whatsapp_clone/models/chats.dart';
 import 'package:whatsapp_clone/screens/chats/chat_screen.dart';
 import 'package:whatsapp_clone/screens/homepage/components/inbox_messages.dart';
 
@@ -43,6 +44,16 @@ class HomepageBody extends StatelessWidget {
             final conversa = conversas[index];
             final prefixo = conversa.ultimaFoiEnviadaPorMim ? 'Você: ' : '';
 
+            final chatParaTick = Chat(
+              username: conversa.contatoId,
+              message: conversa.ultimaMensagem,
+              profilePicture: 'assets/img/default.png',
+              timeStamp: _formatarHorario(conversa.timestamp),
+              isSender: conversa.ultimaFoiEnviadaPorMim,
+              isRead: false,
+              isReceived: !conversa.ultimaFoiEnviadaPorMim,
+            );
+
             return InkWell(
               onTap: () => Navigator.pushNamed(
                 context,
@@ -54,7 +65,7 @@ class HomepageBody extends StatelessWidget {
                 message: '$prefixo${conversa.ultimaMensagem}',
                 timeStamp: _formatarHorario(conversa.timestamp),
                 profilePicture: 'assets/img/default.png',
-                messageTick: null,
+                messageTick: chatParaTick,
               ),
             );
           },
