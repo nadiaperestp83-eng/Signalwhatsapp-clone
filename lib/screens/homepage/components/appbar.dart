@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:whatsapp_clone/screens/settings/settings_screen.dart';
+import 'package:whatsapp_clone/screens/homepage/components/widgets/homepage_menu_sheet.dart';
 
 
 AppBar homepageHeader(context) {
@@ -22,7 +22,7 @@ AppBar homepageHeader(context) {
         icon: const Icon(Icons.search_outlined),
       ),
       IconButton(
-        onPressed: () => Navigator.pushNamed(context, SettingsScreen.routeName), 
+        onPressed: () => showHomepageMenuSheet(context), 
         icon: const Icon(Icons.more_vert),
       ),
     ],
