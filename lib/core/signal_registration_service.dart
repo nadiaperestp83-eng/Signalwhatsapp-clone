@@ -4,9 +4,11 @@ import 'package:http/http.dart' as http;
 class SignalRegistrationService {
   final String bridgeBaseUrl;
 
-  SignalRegistrationService({required this.bridgeBaseUrl});
+  SignalRegistrationService({required String bridgeBaseUrl})
+      : bridgeBaseUrl = bridgeBaseUrl.endsWith('/')
+            ? bridgeBaseUrl.substring(0, bridgeBaseUrl.length - 1)
+            : bridgeBaseUrl;
 
-  /// Tenta registrar. Se precisar de captcha, retorna precisaCaptcha=true e captchaUrl.
   Future<Map<String, dynamic>> registrar({
     required String telefone,
     String? captchaToken,
