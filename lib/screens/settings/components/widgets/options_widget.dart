@@ -6,12 +6,14 @@ class OptionsWidget extends StatelessWidget {
   final String optionsTitle;
   final String optionsDescription;
   final IconData icon;
+  final VoidCallback? onTap;
 
   const OptionsWidget({
     super.key,
     required this.optionsTitle,
     required this.optionsDescription,
     required this.icon,
+    this.onTap,
   });
 
   @override
@@ -19,7 +21,7 @@ class OptionsWidget extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10.0),
       child: InkWell(
-        onTap: () {},
+        onTap: onTap ?? () {},
         child: ListTile(
           leading: Icon(icon, color: kTextDarkColor),
           title: Text(
