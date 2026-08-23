@@ -57,7 +57,10 @@ class WhatsAppClone extends StatelessWidget {
           unselectedItemColor: kTextColor,
           type: BottomNavigationBarType.fixed,
         ),
-        colorScheme: ColorScheme.fromSeed(seedColor: kPrimaryColor),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: kPrimaryColor,
+          brightness: Brightness.dark,
+        ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: kPrimaryColor,
         ),
