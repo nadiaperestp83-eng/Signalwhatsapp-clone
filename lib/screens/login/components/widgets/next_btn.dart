@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
+import 'package:whatsapp_clone/core/signal_core.dart';
 import 'package:whatsapp_clone/core/signal_registration_service.dart';
 import 'package:whatsapp_clone/screens/captcha/captcha_screen.dart';
 import 'package:whatsapp_clone/screens/otp/otp_screen.dart';
+import 'package:whatsapp_clone/common/screens/homescreen.dart';
 
 const String _signalBridgeUrl = String.fromEnvironment('SIGNAL_BRIDGE_URL');
 
@@ -40,15 +42,25 @@ class _NextButtonState extends State<NextButton> {
     final service = SignalRegistrationService(bridgeBaseUrl: _signalBridgeUrl);
 
     try {
-      debugPrint('=== Chamando registrar() com telefone: ${widget.telefoneCompleto}');
+      final jaRegistrado = await service.jaRegistrado(widget.telefoneCompleto);
+
+      if (jaRegistrado) {
+        debugPrint('=== Conta já registrada e ativa. Pulando OTP direto pro app.');
+        await SignalCore().inicializarCasulo(meuUserId: widget.telefoneCompleto);
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          HomeScreen.routeName,
+          (route) => false,
+        );
+        return;
+      }
+
       var resultado = await service.registrar(telefone: widget.telefoneCompleto);
-      debugPrint('=== Resultado bruto do registrar(): $resultado');
 
       if (resultado['precisaCaptcha'] == true) {
-        debugPrint('=== Precisa captcha, abrindo CaptchaScreen');
         if (!mounted) return;
         final token = await Navigator.pushNamed(context, CaptchaScreen.routeName);
-        debugPrint('=== Token recebido da CaptchaScreen: $token');
 
         if (token == null || token is! String) {
           setState(() => _carregando = false);
@@ -59,7 +71,17 @@ class _NextButtonState extends State<NextButton> {
           telefone: widget.telefoneCompleto,
           captchaToken: token,
         );
-        debugPrint('=== Resultado após captcha: $resultado');
+      }
+
+      if (resultado['jaRegistrado'] == true) {
+        await SignalCore().inicializarCasulo(meuUserId: widget.telefoneCompleto);
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          HomeScreen.routeName,
+          (route) => false,
+        );
+        return;
       }
 
       if (resultado['sucesso'] != true) {
@@ -72,12 +94,10 @@ class _NextButtonState extends State<NextButton> {
         OTPScreen.routeName,
         arguments: widget.telefoneCompleto,
       );
-    } catch (e, stackTrace) {
-      debugPrint('=== ERRO CAPTURADO: $e');
-      debugPrint('=== STACK TRACE: $stackTrace');
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao registrar: $e\n\n$stackTrace')),
+          SnackBar(content: Text('Erro ao registrar: $e')),
         );
       }
     } finally {
