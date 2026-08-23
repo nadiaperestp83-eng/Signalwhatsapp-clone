@@ -11,9 +11,10 @@ class UserProfileInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.grey.shade500,
-        backgroundImage: const AssetImage('assets/img/default.png'),
+      onTap: () => Navigator.pushNamed(context, ProfileScreen.routeName),
+      leading: const CircleAvatar(
+        backgroundColor: Colors.grey,
+        backgroundImage: AssetImage('assets/img/default.png'),
         radius: 30.0,
       ),
       title: const Text(
