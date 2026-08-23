@@ -40,11 +40,15 @@ class _NextButtonState extends State<NextButton> {
     final service = SignalRegistrationService(bridgeBaseUrl: _signalBridgeUrl);
 
     try {
+      debugPrint('=== Chamando registrar() com telefone: ${widget.telefoneCompleto}');
       var resultado = await service.registrar(telefone: widget.telefoneCompleto);
+      debugPrint('=== Resultado bruto do registrar(): $resultado');
 
       if (resultado['precisaCaptcha'] == true) {
+        debugPrint('=== Precisa captcha, abrindo CaptchaScreen');
         if (!mounted) return;
         final token = await Navigator.pushNamed(context, CaptchaScreen.routeName);
+        debugPrint('=== Token recebido da CaptchaScreen: $token');
 
         if (token == null || token is! String) {
           setState(() => _carregando = false);
@@ -55,6 +59,7 @@ class _NextButtonState extends State<NextButton> {
           telefone: widget.telefoneCompleto,
           captchaToken: token,
         );
+        debugPrint('=== Resultado após captcha: $resultado');
       }
 
       if (resultado['sucesso'] != true) {
@@ -67,10 +72,12 @@ class _NextButtonState extends State<NextButton> {
         OTPScreen.routeName,
         arguments: widget.telefoneCompleto,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('=== ERRO CAPTURADO: $e');
+      debugPrint('=== STACK TRACE: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao registrar: $e')),
+          SnackBar(content: Text('Erro ao registrar: $e\n\n$stackTrace')),
         );
       }
     } finally {
