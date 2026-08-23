@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
+import 'package:whatsapp_clone/screens/profile/profile_screen.dart';
 import 'package:whatsapp_clone/screens/settings/components/widgets/options_widget.dart';
 import 'package:whatsapp_clone/screens/settings/components/widgets/user_profile.dart';
 
@@ -9,54 +10,61 @@ class SettingsScreenBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SingleChildScrollView(
+    return SingleChildScrollView(
       child: Padding(
-        padding: EdgeInsets.only(bottom: 10.0),
+        padding: const EdgeInsets.only(bottom: 10.0),
         child: Column(
           children: [
-            UserProfileInfo(),  // profile pic, bio + additional icons
-            Divider(color: kDividerColor),
+            const UserProfileInfo(),  // profile pic, bio + additional icons
+            const Divider(color: kDividerColor),
             
             // options
             OptionsWidget(
               icon: Icons.key_outlined,
               optionsTitle: 'Account',
               optionsDescription: 'Security notifications, change number',
+              onTap: () {},
             ),
             OptionsWidget(
               icon: Icons.lock_outlined,
               optionsTitle: 'Privacy',
               optionsDescription: 'Block contacts, disappearing messages',
+              onTap: () {},
             ),
             OptionsWidget(
               icon: Icons.face_outlined,
               optionsTitle: 'Avatar',
               optionsDescription: 'Create, edit, profile photo',
+              onTap: () => Navigator.pushNamed(context, ProfileScreen.routeName),
             ),
             OptionsWidget(
               icon: Icons.message_outlined,
               optionsTitle: 'Chats',
               optionsDescription: 'Theme, wallpapers, chat history',
+              onTap: () {},
             ),
             OptionsWidget(
               icon: Icons.notifications_outlined,
               optionsTitle: 'Notifications',
               optionsDescription: 'Message, group & call tones',
+              onTap: () {},
             ),
             OptionsWidget(
               icon: Icons.donut_large_outlined,
               optionsTitle: 'Storage and data',
               optionsDescription: 'Network usage, auto-download',
+              onTap: () {},
             ),
             OptionsWidget(
               icon: Icons.language,
               optionsTitle: 'App language',
               optionsDescription: 'Language settings',
+              onTap: () {},
             ),
         
-            Divider(color: kDividerColor),
+            const Divider(color: kDividerColor),
             // footer
-            Padding(
+            const Padding(
               padding: EdgeInsets.symmetric(vertical: 10.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
