@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/common/screens/homescreen.dart';
 import 'package:whatsapp_clone/screens/captcha/captcha_screen.dart';
 import 'package:whatsapp_clone/screens/chats/chat_screen.dart';
+import 'package:whatsapp_clone/screens/homepage/components/widgets/select_contact_screen.dart';
 import 'package:whatsapp_clone/screens/login/login_screen.dart';
 import 'package:whatsapp_clone/screens/onboarding_screen/onboarding_screen.dart';
 import 'package:whatsapp_clone/screens/otp/otp_screen.dart';
@@ -20,4 +21,5 @@ final Map<String, WidgetBuilder> routes = {
   ChatScreen.routeName: (context) => const ChatScreen(),
   SettingsScreen.routeName: (context) => const SettingsScreen(),
   ProfileScreen.routeName: (context) => const ProfileScreen(),
+  SelectContactScreen.routeName: (context) => const SelectContactScreen(),
 } ;
