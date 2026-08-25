@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
+import 'package:whatsapp_clone/core/signal_core.dart';
 import 'package:whatsapp_clone/routes.dart';
 import 'package:whatsapp_clone/screens/onboarding_screen/onboarding_screen.dart';
 
@@ -25,8 +26,34 @@ void main() async {
   runApp(const WhatsAppClone());
 }
 
-class WhatsAppClone extends StatelessWidget {
+class WhatsAppClone extends StatefulWidget {
   const WhatsAppClone({super.key});
+
+  @override
+  State<WhatsAppClone> createState() => _WhatsAppCloneState();
+}
+
+class _WhatsAppCloneState extends State<WhatsAppClone> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // O Android mata o WebSocket do Realtime quando o app vai pro segundo
+    // plano. Quando o app volta (resumed), reconecta e busca o que perdeu.
+    if (state == AppLifecycleState.resumed) {
+      SignalCore().reconectarSeNecessario();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
