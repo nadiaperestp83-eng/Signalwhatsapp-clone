@@ -71,6 +71,7 @@ class SignalCore {
 
   Stream<MensagemDescriptografada> get mensagensRecebidas => _streamController.stream;
   bool get estaInicializado => _inicializado;
+  String get meuUserId => _meuUserId;
 
   // ===== Índice local de conversas (persistido no dispositivo) =====
 
@@ -144,6 +145,7 @@ class SignalCore {
     await _publicarMeuBundle(preKeys);
     await _carregarConversasPersistidas();
     _escutarMensagensEntrantes();
+    await verificarMensagensPendentes();
 
     _inicializado = true;
   }
@@ -151,6 +153,42 @@ class SignalCore {
   Future<void> encerrarCasulo() async {
     await _canal?.unsubscribe();
     _inicializado = false;
+  }
+
+  /// Chame quando o app volta do segundo plano — o Android mata o WebSocket
+  /// quando o app fica em background, então isso reconecta o canal ao vivo
+  /// E busca mensagens que chegaram enquanto o app estava desconectado
+  /// (o Realtime só notifica eventos ao vivo, não reenvia o que perdeu).
+  Future<void> reconectarSeNecessario() async {
+    if (!_inicializado || _meuUserId.isEmpty) return;
+
+    try {
+      await _canal?.unsubscribe();
+      _escutarMensagensEntrantes();
+      await verificarMensagensPendentes();
+    } catch (e) {
+      print('Erro ao reconectar o Casulo: $e');
+    }
+  }
+
+  /// Busca diretamente no Supabase qualquer mensagem que já esteja esperando
+  /// pra mim, mesmo que o Realtime não tenha notificado (ex: chegou enquanto
+  /// o app estava fechado/em segundo plano).
+  Future<void> verificarMensagensPendentes() async {
+    if (_meuUserId.isEmpty) return;
+
+    try {
+      final linhas = await _supabase
+          .from('signal_messages')
+          .select()
+          .eq('recipient_id', _meuUserId);
+
+      for (final row in linhas as List) {
+        await _processarMensagemEntrante(row as Map<String, dynamic>);
+      }
+    } catch (e) {
+      print('Erro ao verificar mensagens pendentes: $e');
+    }
   }
 
   Future<void> _publicarMeuBundle(List<PreKeyRecord> preKeys) async {
