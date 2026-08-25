@@ -15,9 +15,40 @@ class AddStatusNoteorAddMedia extends StatelessWidget {
     );
   }
 
-  Future<void> _tirarFotoParaStory(BuildContext context) async {
+  Future<void> _escolherOrigemDaFoto(BuildContext context) async {
+    final origem = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: const Color(0xFF1F2C34),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16.0)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8.0),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: kPrimaryColor),
+                title: const Text('Câmera', style: TextStyle(color: kTextColor)),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: kPrimaryColor),
+                title: const Text('Galeria', style: TextStyle(color: kTextColor)),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              const SizedBox(height: 8.0),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (origem == null || !context.mounted) return;
+
     final picker = ImagePicker();
-    final arquivo = await picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+    final arquivo = await picker.pickImage(source: origem, imageQuality: 90);
     if (arquivo == null || !context.mounted) return;
 
     await Navigator.of(context).push(
@@ -45,7 +76,7 @@ class AddStatusNoteorAddMedia extends StatelessWidget {
               const SizedBox(height: 10.0),
               FloatingActionButton(
                 heroTag: 'cameraStoryFab',
-                onPressed: () => _tirarFotoParaStory(context),
+                onPressed: () => _escolherOrigemDaFoto(context),
                 child: const Icon(Icons.camera_alt),
               )
             ],
