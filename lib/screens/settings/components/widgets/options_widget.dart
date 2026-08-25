@@ -4,14 +4,14 @@ import 'package:whatsapp_clone/constants/colors.dart';
 
 class OptionsWidget extends StatelessWidget {
   final String optionsTitle;
-  final String optionsDescription;
+  final String? optionsDescription;
   final IconData icon;
   final VoidCallback? onTap;
 
   const OptionsWidget({
     super.key,
     required this.optionsTitle,
-    required this.optionsDescription,
+    this.optionsDescription,
     required this.icon,
     this.onTap,
   });
@@ -30,14 +30,15 @@ class OptionsWidget extends StatelessWidget {
               color: kTextColor,
             ),
           ),
-          subtitle: Text(
-            optionsDescription,
-            style: const TextStyle(
-              color: kTextDarkColor,
-              fontSize: 15.0,
-            ),
-          ),
-        
+          subtitle: optionsDescription != null
+              ? Text(
+                  optionsDescription!,
+                  style: const TextStyle(
+                    color: kTextDarkColor,
+                    fontSize: 15.0,
+                  ),
+                )
+              : null,
         ),
       ),
     );
