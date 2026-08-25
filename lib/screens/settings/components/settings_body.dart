@@ -15,55 +15,82 @@ class SettingsScreenBody extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 10.0),
         child: Column(
           children: [
-            const UserProfileInfo(),  // profile pic, bio + additional icons
+            const UserProfileInfo(),
             const Divider(color: kDividerColor),
-            
-            // options
+
             OptionsWidget(
-              icon: Icons.key_outlined,
-              optionsTitle: 'Account',
-              optionsDescription: 'Security notifications, change number',
+              icon: Icons.person_outline,
+              optionsTitle: 'Conta',
               onTap: () {},
             ),
             OptionsWidget(
-              icon: Icons.lock_outlined,
-              optionsTitle: 'Privacy',
-              optionsDescription: 'Block contacts, disappearing messages',
+              icon: Icons.devices_outlined,
+              optionsTitle: 'Dispositivos vinculados',
               onTap: () {},
             ),
             OptionsWidget(
-              icon: Icons.face_outlined,
-              optionsTitle: 'Avatar',
-              optionsDescription: 'Create, edit, profile photo',
-              onTap: () => Navigator.pushNamed(context, ProfileScreen.routeName),
+              icon: Icons.favorite_border,
+              optionsTitle: 'Doar para o Signal',
+              onTap: () {},
+            ),
+
+            const Divider(color: kDividerColor),
+
+            OptionsWidget(
+              icon: Icons.contrast_outlined,
+              optionsTitle: 'Aparência',
+              onTap: () {},
             ),
             OptionsWidget(
-              icon: Icons.message_outlined,
+              icon: Icons.chat_bubble_outline,
               optionsTitle: 'Chats',
-              optionsDescription: 'Theme, wallpapers, chat history',
+              onTap: () {},
+            ),
+            OptionsWidget(
+              icon: Icons.auto_stories_outlined,
+              optionsTitle: 'Stories',
               onTap: () {},
             ),
             OptionsWidget(
               icon: Icons.notifications_outlined,
-              optionsTitle: 'Notifications',
-              optionsDescription: 'Message, group & call tones',
+              optionsTitle: 'Notificações',
               onTap: () {},
             ),
             OptionsWidget(
-              icon: Icons.donut_large_outlined,
-              optionsTitle: 'Storage and data',
-              optionsDescription: 'Network usage, auto-download',
+              icon: Icons.lock_outline,
+              optionsTitle: 'Privacidade',
               onTap: () {},
             ),
             OptionsWidget(
-              icon: Icons.language,
-              optionsTitle: 'App language',
-              optionsDescription: 'Language settings',
+              icon: Icons.restore_outlined,
+              optionsTitle: 'Backups',
               onTap: () {},
             ),
-        
+            OptionsWidget(
+              icon: Icons.pie_chart_outline,
+              optionsTitle: 'Dados e armazenamento',
+              onTap: () {},
+            ),
+            OptionsWidget(
+              icon: Icons.credit_card_outlined,
+              optionsTitle: 'Pagamentos',
+              onTap: () {},
+            ),
+
             const Divider(color: kDividerColor),
-            // footer
+
+            OptionsWidget(
+              icon: Icons.help_outline,
+              optionsTitle: 'Ajuda',
+              onTap: () {},
+            ),
+            OptionsWidget(
+              icon: Icons.mail_outline,
+              optionsTitle: 'Convide seus amigos',
+              onTap: () {},
+            ),
+
+            const Divider(color: kDividerColor),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10.0),
               child: Row(
@@ -86,7 +113,6 @@ class SettingsScreenBody extends StatelessWidget {
                 ],
               ),
             ),
-        
           ],
         ),
       ),
