@@ -1,4 +1,4 @@
-# WhatsApp clone
+# client signal under development
 
 ## Demo
 
@@ -8,7 +8,7 @@
 
 
 ## Overview
-This is a WhatsApp mobile app clone. The mobile app is developed for both Android and iOS.
+This is a client signal. The mobile app is developed for both Android .
 
 ## Developer instructions
 ---
