@@ -50,6 +50,24 @@ class SignalCore {
   factory SignalCore() => _instance;
   SignalCore._internal();
 
+  static const String _chaveSessaoTelefone = 'signal_core_meu_user_id';
+
+  /// Lê o telefone da última sessão salva em disco, se existir.
+  /// Use isso no boot do app (antes do runApp) pra decidir se pula o
+  /// Onboarding e restaura a sessão direto, sem precisar recadastrar.
+  static Future<String?> lerSessaoPersistida() async {
+    final prefs = await SharedPreferences.getInstance();
+    final telefone = prefs.getString(_chaveSessaoTelefone);
+    if (telefone == null || telefone.isEmpty) return null;
+    return telefone;
+  }
+
+  /// Apaga a sessão persistida (ex: botão de logout).
+  static Future<void> limparSessaoPersistida() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_chaveSessaoTelefone);
+  }
+
   bool _inicializado = false;
   late SupabaseClient _supabase;
   RealtimeChannel? _canal;
@@ -129,6 +147,10 @@ class SignalCore {
     if (_inicializado) return;
     _meuUserId = meuUserId;
     _supabase = Supabase.instance.client;
+
+    // Salva o telefone pra sobreviver a restart do app (ver lerSessaoPersistida).
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_chaveSessaoTelefone, meuUserId);
 
     _identityKeyPair = generateIdentityKeyPair();
     _registrationId = generateRegistrationId(false);
