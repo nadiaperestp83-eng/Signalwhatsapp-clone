@@ -25,28 +25,33 @@ void showHomepageMenuSheet(BuildContext context) {
             ),
             const SizedBox(height: 8.0),
             ListTile(
-              leading: const Icon(Icons.group_add_outlined),
-              title: const Text('New group'),
+              leading: const Icon(Icons.group_outlined, color: kTextColor),
+              title: const Text('Novo grupo', style: TextStyle(color: kTextColor)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.campaign_outlined),
-              title: const Text('New broadcast'),
+              leading: const Icon(Icons.done_all_outlined, color: kTextColor),
+              title: const Text('Marcar todas como lidas', style: TextStyle(color: kTextColor)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.devices_outlined),
-              title: const Text('Linked devices'),
+              leading: const Icon(Icons.filter_list_outlined, color: kTextColor),
+              title: const Text('Filtrar chats não lidos', style: TextStyle(color: kTextColor)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.star_border_outlined),
-              title: const Text('Starred messages'),
+              leading: const Icon(Icons.notifications_off_outlined, color: kTextColor),
+              title: const Text('Perfil de notificações', style: TextStyle(color: kTextColor)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Settings'),
+              leading: const Icon(Icons.archive_outlined, color: kTextColor),
+              title: const Text('Chats arquivados', style: TextStyle(color: kTextColor)),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_outlined, color: kTextColor),
+              title: const Text('Configurações', style: TextStyle(color: kTextColor)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, SettingsScreen.routeName);
