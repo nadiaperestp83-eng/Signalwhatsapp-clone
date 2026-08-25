@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:whatsapp_clone/common/screens/homescreen.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
 import 'package:whatsapp_clone/core/signal_core.dart';
 import 'package:whatsapp_clone/routes.dart';
@@ -23,11 +24,32 @@ void main() async {
     anonKey: _supabaseAnonKey,
   );
 
-  runApp(const WhatsAppClone());
+  // Se já existe uma sessão salva de um cadastro anterior, restaura direto
+  // e pula o Onboarding — sem isso, todo restart do app zerava o
+  // SignalCore().meuUserId e quebrava qualquer ação que dependesse dele
+  // (ex: publicar Story).
+  String rotaInicial = OnboardingScreen.routeName;
+  final telefoneSalvo = await SignalCore.lerSessaoPersistida();
+
+  if (telefoneSalvo != null) {
+    try {
+      await SignalCore().inicializarCasulo(meuUserId: telefoneSalvo);
+      rotaInicial = HomeScreen.routeName;
+    } catch (e) {
+      // Sem internet, Supabase fora do ar etc. Cai pro Onboarding em vez de
+      // travar o app abrindo.
+      // ignore: avoid_print
+      print('Não deu pra restaurar a sessão salva: $e');
+    }
+  }
+
+  runApp(WhatsAppClone(rotaInicial: rotaInicial));
 }
 
 class WhatsAppClone extends StatefulWidget {
-  const WhatsAppClone({super.key});
+  final String rotaInicial;
+
+  const WhatsAppClone({super.key, required this.rotaInicial});
 
   @override
   State<WhatsAppClone> createState() => _WhatsAppCloneState();
@@ -94,9 +116,8 @@ class _WhatsAppCloneState extends State<WhatsAppClone> with WidgetsBindingObserv
         scaffoldBackgroundColor: kbackgroundColor,
         useMaterial3: true,
       ),
-      initialRoute: OnboardingScreen.routeName,
+      initialRoute: widget.rotaInicial,
       routes: routes,
-      home: const OnboardingScreen(),
     );
   }
 }
