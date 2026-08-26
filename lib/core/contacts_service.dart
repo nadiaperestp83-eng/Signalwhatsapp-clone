@@ -1,6 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_contacts/flutter_contacts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 
 class ContatoSignal {
   final String nome;
@@ -15,12 +16,141 @@ class ContatoSignal {
 }
 
 class SignalContactsService {
+  // DDIs mais comuns, do mais longo pro mais curto (importa checar os de 3
+  // dígitos antes dos de 1, senão "598" (Uruguai) nunca seria encontrado
+  // porque "5" ou "1" já teriam "batido" antes).
+  //
+  // Isso só é usado pra descobrir o DDI da PRÓPRIA conta (que já vem em
+  // E.164 do cadastro no signal-cli) — não é usado pra adivinhar o país de
+  // números de terceiros.
+  static const List<String> _ddisConhecidos = [
+    '351', // Portugal
+    '598', // Uruguai
+    '55',  // Brasil
+    '54',  // Argentina
+    '52',  // México
+    '44',  // Reino Unido
+    '49',  // Alemanha
+    '34',  // Espanha
+    '33',  // França
+    '39',  // Itália
+    '91',  // Índia
+    '81',  // Japão
+    '86',  // China
+    '1',   // EUA/Canadá
+  ];
+
   static String _somenteDigitos(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
 
-  /// Cruza a agenda do celular com os números registrados no Bridge Signal
-  /// (tabela signal_bundles). Compara pelos últimos 8 dígitos, pra tolerar
-  /// diferenças de formatação (DDI, espaços, traços) entre agenda e registro.
-  static Future<List<ContatoSignal>> buscarContatosRegistrados() async {
+  /// Extrai o DDI do número da PRÓPRIA conta (já em E.164, ex: +5511999998888)
+  /// pra usar como país padrão ao normalizar números da agenda que não têm "+".
+  static String? _extrairDdiDaConta(String numeroContaE164) {
+    final digitos = _somenteDigitos(numeroContaE164);
+    if (digitos.length < 8) return null;
+
+    for (final ddi in _ddisConhecidos) {
+      if (digitos.startsWith(ddi)) return ddi;
+    }
+    // Fallback: assume 2 dígitos de DDI (cobre a maioria dos casos fora
+    // da lista acima).
+    return digitos.substring(0, 2);
+  }
+
+  /// Normaliza um número da agenda do aparelho pra E.164 (ex: +5511988887777).
+  ///
+  /// Regra (mesma ideia que Signal/Molly usam pra descoberta de contatos:
+  /// comparar o número internacional completo, não um pedaço dele):
+  /// - Já tem "+"  -> mantém como está (assume que já é E.164).
+  /// - Começa com "00" -> "00" vira "+" (formato de discagem internacional
+  ///   comum fora dos EUA).
+  /// - Sem prefixo internacional -> assume o mesmo DDI da conta cadastrada
+  ///   neste aparelho, removendo um possível "0" de tronco nacional.
+  ///   LIMITAÇÃO CONHECIDA: se o contato for de outro país e estiver salvo
+  ///   sem "+" na agenda, não tem como adivinhar — mesma limitação que
+  ///   WhatsApp/Signal têm nesse caso (a orientação padrão deles também é
+  ///   "salve com o código do país").
+  static String? _normalizarParaE164(String numeroBruto, String? ddiPadrao) {
+    var limpo = numeroBruto.replaceAll(RegExp(r'[^\d+]'), '');
+    if (limpo.isEmpty) return null;
+
+    if (limpo.startsWith('+')) {
+      final digitos = limpo.substring(1);
+      if (digitos.length < 8) return null;
+      return '+$digitos';
+    }
+
+    if (limpo.startsWith('00')) {
+      final digitos = limpo.substring(2);
+      if (digitos.length < 8) return null;
+      return '+$digitos';
+    }
+
+    if (ddiPadrao == null) return null;
+
+    var nacional = limpo;
+    if (nacional.startsWith('0')) {
+      nacional = nacional.substring(1);
+    }
+    if (nacional.length < 7) return null;
+
+    return '+$ddiPadrao$nacional';
+  }
+
+  /// Verifica no bridge (signal-cli), em lotes, quais números da lista estão
+  /// registrados de verdade no Signal. Sequencial (nunca em paralelo) porque
+  /// o signal-cli trava a config da conta por lockfile — chamadas
+  /// concorrentes pra mesma conta podem falhar.
+  static Future<Map<String, bool>> _verificarLoteNoBridge({
+    required String bridgeBaseUrl,
+    required String contaTelefone,
+    required List<String> numeros,
+    void Function(int verificados, int total)? aoProgredir,
+  }) async {
+    final resultado = <String, bool>{};
+    const tamanhoLote = 50;
+    var verificados = 0;
+
+    for (var i = 0; i < numeros.length; i += tamanhoLote) {
+      final fim = (i + tamanhoLote > numeros.length) ? numeros.length : i + tamanhoLote;
+      final lote = numeros.sublist(i, fim);
+
+      final resposta = await http.post(
+        Uri.parse('$bridgeBaseUrl/getUsersStatus'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': contaTelefone, 'recipients': lote}),
+      );
+
+      if (resposta.statusCode != 200) {
+        throw StateError(
+          'Bridge retornou ${resposta.statusCode} ao verificar contatos: ${resposta.body}',
+        );
+      }
+
+      final corpo = jsonDecode(resposta.body) as Map<String, dynamic>;
+      final resultados = (corpo['resultados'] as List<dynamic>?) ?? [];
+
+      for (final item in resultados) {
+        final mapa = item as Map<String, dynamic>;
+        final numero = mapa['numero'] as String?;
+        final registrado = mapa['registrado'] == true;
+        if (numero != null) resultado[numero] = registrado;
+      }
+
+      verificados += lote.length;
+      aoProgredir?.call(verificados, numeros.length);
+    }
+
+    return resultado;
+  }
+
+  /// Cruza a agenda do celular com quem está REALMENTE registrado no Signal,
+  /// perguntando direto pro bridge (signal-cli) — não mais pela tabela
+  /// signal_bundles do Supabase, que só lista quem já abriu esse fork.
+  static Future<List<ContatoSignal>> buscarContatosRegistrados({
+    required String bridgeBaseUrl,
+    required String contaTelefone,
+    void Function(int verificados, int total)? aoProgredir,
+  }) async {
     final permitido = await FlutterContacts.requestPermission();
     if (!permitido) {
       throw StateError('Permissão de contatos negada.');
@@ -31,41 +161,53 @@ class SignalContactsService {
       withPhoto: true,
     );
 
-    final linhas = await Supabase.instance.client
-        .from('signal_bundles')
-        .select('user_id');
+    final ddiPadrao = _extrairDdiDaConta(contaTelefone);
 
-    final numerosRegistrados =
-        (linhas as List).map((row) => row['user_id'] as String).toList();
+    // contato -> lista de (número normalizado) pra tentar, na ordem em que
+    // aparecem na agenda.
+    final numerosPorContato = <int, List<String>>{};
+    final todosNumerosUnicos = <String>{};
 
-    final indiceRegistrados = <String, String>{};
-    for (final numero in numerosRegistrados) {
-      final digitos = _somenteDigitos(numero);
-      if (digitos.length >= 8) {
-        indiceRegistrados[digitos.substring(digitos.length - 8)] = numero;
+    for (var idx = 0; idx < contatosDispositivo.length; idx++) {
+      final normalizados = <String>[];
+      for (final telefone in contatosDispositivo[idx].phones) {
+        final normalizado = _normalizarParaE164(telefone.number, ddiPadrao);
+        if (normalizado != null) {
+          normalizados.add(normalizado);
+          todosNumerosUnicos.add(normalizado);
+        }
+      }
+      if (normalizados.isNotEmpty) {
+        numerosPorContato[idx] = normalizados;
       }
     }
+
+    if (todosNumerosUnicos.isEmpty) {
+      return [];
+    }
+
+    final registrados = await _verificarLoteNoBridge(
+      bridgeBaseUrl: bridgeBaseUrl,
+      contaTelefone: contaTelefone,
+      numeros: todosNumerosUnicos.toList(),
+      aoProgredir: aoProgredir,
+    );
 
     final resultado = <ContatoSignal>[];
 
-    for (final contato in contatosDispositivo) {
-      for (final telefone in contato.phones) {
-        final digitos = _somenteDigitos(telefone.number);
-        if (digitos.length < 8) continue;
-
-        final chave = digitos.substring(digitos.length - 8);
-        final numeroRegistrado = indiceRegistrados[chave];
-
-        if (numeroRegistrado != null) {
+    numerosPorContato.forEach((idx, numeros) {
+      for (final numero in numeros) {
+        if (registrados[numero] == true) {
+          final contato = contatosDispositivo[idx];
           resultado.add(ContatoSignal(
             nome: contato.displayName,
             foto: contato.photo,
-            telefoneRegistrado: numeroRegistrado,
+            telefoneRegistrado: numero,
           ));
-          break;
+          break; // um match já basta pra esse contato
         }
       }
-    }
+    });
 
     resultado.sort((a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()));
     return resultado;
