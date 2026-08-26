@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:whatsapp_clone/common/screens/homescreen.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
@@ -79,42 +80,74 @@ class _WhatsAppCloneState extends State<WhatsAppClone> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
+    // Tema global iOS light + fonte Inter.
+    //
+    // A maioria das telas do app usa `Text(texto, style: TextStyle(color:
+    // kTextColor))` — ou seja, define COR mas não fonte. Quando o Flutter
+    // não acha um fontFamily explícito num TextStyle, ele herda do
+    // DefaultTextStyle ambiente, que por sua vez vem do textTheme do Theme.
+    // Por isso, aplicar o Inter aqui (uma vez) já cobre o app inteiro sem
+    // precisar tocar em cada Text() de cada tela.
+    final textThemeInter = GoogleFonts.interTextTheme(
+      ThemeData.light().textTheme,
+    ).apply(
+      bodyColor: kTextColor,
+      displayColor: kTextColor,
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.light,
       theme: ThemeData(
-        appBarTheme: const AppBarTheme(
-          color: kAppBarColor,
-          iconTheme: IconThemeData(
-            color: kIconColor,
-          ),
-          titleTextStyle: TextStyle(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        fontFamily: GoogleFonts.inter().fontFamily,
+        textTheme: textThemeInter,
+        colorScheme: const ColorScheme.light(
+          primary: kPrimaryColor,
+          onPrimary: Colors.white,
+          secondary: kPrimaryColor,
+          onSecondary: Colors.white,
+          surface: Color(0xFFFFFFFF),
+          onSurface: Color(0xFF1C1C1E),
+          error: Color(0xFFFF3B30),
+          onError: Colors.white,
+        ),
+        scaffoldBackgroundColor: kbackgroundColor,
+        appBarTheme: AppBarTheme(
+          backgroundColor: kAppBarColor,
+          foregroundColor: kTextColor,
+          elevation: 0,
+          scrolledUnderElevation: 1,
+          surfaceTintColor: Colors.transparent,
+          iconTheme: const IconThemeData(color: kIconColor),
+          titleTextStyle: GoogleFonts.inter(
             color: kTextColor,
             fontSize: 18.0,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Color(0xFFFFFFFF),
+          modalBackgroundColor: Color(0xFFFFFFFF),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
           ),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: kbackgroundColor,
           enableFeedback: false,
-          selectedIconTheme: IconThemeData(
-            color: kIconColor,
-            shadows: [Shadow(color: kbackgroundColor)],
-          ),
+          selectedIconTheme: IconThemeData(color: kIconColor),
           selectedItemColor: kTextColor,
-          unselectedIconTheme: IconThemeData(
-            color: kIconColor,
-          ),
-          unselectedItemColor: kTextColor,
+          unselectedIconTheme: IconThemeData(color: kTextDarkColor),
+          unselectedItemColor: kTextDarkColor,
           type: BottomNavigationBarType.fixed,
-        ),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: kPrimaryColor,
-          brightness: Brightness.dark,
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: kPrimaryColor,
+          foregroundColor: Colors.white,
         ),
-        scaffoldBackgroundColor: kbackgroundColor,
-        useMaterial3: true,
+        dividerColor: kDividerColor,
       ),
       initialRoute: widget.rotaInicial,
       routes: routes,
