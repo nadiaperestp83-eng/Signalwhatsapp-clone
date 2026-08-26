@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
-import 'package:whatsapp_clone/core/signal_core.dart';
 
 class SendMessageAndRecordAudioWidget extends StatefulWidget {
-  final String targetUserId;
-  final ValueChanged<String> onMensagemEnviada;
+  final Future<void> Function(String texto) onEnviar;
 
   const SendMessageAndRecordAudioWidget({
     super.key,
-    required this.targetUserId,
-    required this.onMensagemEnviada,
+    required this.onEnviar,
   });
 
   @override
@@ -21,6 +18,7 @@ class _SendMessageAndRecordAudioWidgetState
     extends State<SendMessageAndRecordAudioWidget> {
   final TextEditingController _controller = TextEditingController();
   bool _temTexto = false;
+  bool _enviando = false;
 
   @override
   void initState() {
@@ -35,11 +33,11 @@ class _SendMessageAndRecordAudioWidgetState
 
   Future<void> _enviar() async {
     final texto = _controller.text.trim();
-    if (texto.isEmpty) return;
+    if (texto.isEmpty || _enviando) return;
 
+    setState(() => _enviando = true);
     try {
-      await SignalCore().enviarMensagemSegura(widget.targetUserId, texto);
-      widget.onMensagemEnviada(texto);
+      await widget.onEnviar(texto);
       _controller.clear();
     } catch (e) {
       if (mounted) {
@@ -47,6 +45,8 @@ class _SendMessageAndRecordAudioWidgetState
           SnackBar(content: Text('Falha ao enviar mensagem segura: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _enviando = false);
     }
   }
 
@@ -102,11 +102,17 @@ class _SendMessageAndRecordAudioWidgetState
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            onPressed: _temTexto ? _enviar : () {},
-            icon: Icon(
-              _temTexto ? Icons.send : Icons.mic,
-              color: Colors.black,
-            ),
+            onPressed: _enviando ? null : (_temTexto ? _enviar : () {}),
+            icon: _enviando
+                ? const SizedBox(
+                    width: 18.0,
+                    height: 18.0,
+                    child: CircularProgressIndicator(strokeWidth: 2.0, color: Colors.black),
+                  )
+                : Icon(
+                    _temTexto ? Icons.send : Icons.mic,
+                    color: Colors.black,
+                  ),
           ),
         ),
       ],
