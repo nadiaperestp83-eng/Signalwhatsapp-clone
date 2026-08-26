@@ -18,7 +18,7 @@ class AddStatusNoteorAddMedia extends StatelessWidget {
   Future<void> _escolherOrigemDaFoto(BuildContext context) async {
     final origem = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: const Color(0xFF1F2C34),
+      backgroundColor: kAppBarColor, // era Color(0xFF1F2C34) fixo, duplicava kAppBarColor
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16.0)),
       ),
@@ -69,9 +69,9 @@ class AddStatusNoteorAddMedia extends StatelessWidget {
             children: [
               FloatingActionButton.small(
                 heroTag: 'editStoryFab',
-                backgroundColor: const Color(0xFF222F36),
+                backgroundColor: kAppBarColor, // era Color(0xFF222F36) fixo — escuro, destoava do tema light
                 onPressed: () => _abrirStoryDeTexto(context),
-                child: const Icon(Icons.edit, color: kTextDarkColor),
+                child: const Icon(Icons.edit, color: kIconColor),
               ),
               const SizedBox(height: 10.0),
               FloatingActionButton(
