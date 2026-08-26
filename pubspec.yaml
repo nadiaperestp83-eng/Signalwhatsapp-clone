@@ -24,6 +24,10 @@ dependencies:
   flutter_launcher_icons: ^0.13.1
   image_picker: ^1.1.2
 
+  # 🎨 Tema iOS light + fonte Inter global — baixa a fonte em runtime, sem
+  # precisar empacotar .ttf em assets/fonts.
+  google_fonts: ^6.2.1
+
 flutter_launcher_icons:
   android: true
   ios: true
