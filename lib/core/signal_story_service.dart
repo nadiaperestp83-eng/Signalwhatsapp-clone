@@ -22,16 +22,25 @@ class SignalStoryService {
     required Uint8List imagemPng,
     String? groupId,
   }) async {
-    final resposta = await http.post(
-      Uri.parse('$bridgeBaseUrl/uploadStory'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': telefone,
-        'imageBase64': base64Encode(imagemPng),
-        'mimeType': 'image/png',
-        if (groupId != null && groupId.trim().isNotEmpty) 'groupId': groupId.trim(),
-      }),
-    );
+    final resposta = await http
+        .post(
+          Uri.parse('$bridgeBaseUrl/uploadStory'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'phone': telefone,
+            'imageBase64': base64Encode(imagemPng),
+            'mimeType': 'image/png',
+            if (groupId != null && groupId.trim().isNotEmpty) 'groupId': groupId.trim(),
+          }),
+        )
+        .timeout(
+          const Duration(seconds: 45),
+          onTimeout: () => throw StateError(
+            'A bridge demorou demais pra responder (timeout de 45s). '
+            'Se o servidor no Railway ficou inativo, a primeira tentativa '
+            'pode precisar de um cold start — tenta de novo.',
+          ),
+        );
 
     return jsonDecode(resposta.body) as Map<String, dynamic>;
   }
