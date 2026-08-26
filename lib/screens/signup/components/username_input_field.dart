@@ -1,15 +1,21 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/common/screens/homescreen.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
 import 'package:whatsapp_clone/core/signal_core.dart';
+import 'package:whatsapp_clone/core/signal_profile_service.dart';
+
+const String _signalBridgeUrl = String.fromEnvironment('SIGNAL_BRIDGE_URL');
 
 class UsernameInputField extends StatefulWidget {
   const UsernameInputField({
     super.key,
     required this.usernameController,
+    required this.avatarSelecionado,
   });
 
   final TextEditingController usernameController;
+  final File? avatarSelecionado;
 
   @override
   State<UsernameInputField> createState() => _UsernameInputFieldState();
@@ -23,6 +29,9 @@ class _UsernameInputFieldState extends State<UsernameInputField> {
   // inicializarCasulo(). Resultado: SignalCore().meuUserId ficava '' pra
   // sempre em qualquer cadastro novo, e qualquer ação que dependesse dele
   // (ex: publicar Story) quebrava com "Bad state: phone é obrigatório".
+  //
+  // Agora também manda nome + foto (se escolhida) pro bridge via
+  // updateProfile, já que é exatamente o propósito dessa tela.
   Future<void> _concluirCadastro(BuildContext context) async {
     if (_concluindo) return;
 
@@ -43,6 +52,28 @@ class _UsernameInputFieldState extends State<UsernameInputField> {
 
     try {
       await SignalCore().inicializarCasulo(meuUserId: telefone);
+
+      final nome = widget.usernameController.text.trim();
+      if (nome.isNotEmpty || widget.avatarSelecionado != null) {
+        try {
+          final service = SignalProfileService(bridgeBaseUrl: _signalBridgeUrl);
+          await service.atualizarPerfil(
+            telefone: telefone,
+            nome: nome.isNotEmpty ? nome : null,
+            novoAvatar: widget.avatarSelecionado,
+          );
+        } catch (e) {
+          // Não bloqueia o cadastro se só o updateProfile falhar (ex: bridge
+          // fora do ar) — a conta já foi inicializada, o usuário pode tentar
+          // trocar nome/foto depois na tela de Perfil.
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Cadastro concluído, mas falhou ao salvar nome/foto: $e')),
+            );
+          }
+        }
+      }
+
       if (!context.mounted) return;
       Navigator.popAndPushNamed(context, HomeScreen.routeName);
     } catch (e) {
