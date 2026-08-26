@@ -21,18 +21,33 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
   final TextEditingController _buscaController = TextEditingController();
   String _busca = '';
 
+  int _verificados = 0;
+  int _totalParaVerificar = 0;
+
   @override
   void initState() {
     super.initState();
     _carregarContatos();
     _buscaController.addListener(() {
-      setState(() => _busca = _buscaController.text.trim().toLowerCase());
+      setState(() => _busca = _buscaController.text.trim());
     });
   }
 
   void _carregarContatos() {
     setState(() {
-      _futureContatos = SignalContactsService.buscarContatosRegistrados();
+      _verificados = 0;
+      _totalParaVerificar = 0;
+      _futureContatos = SignalContactsService.buscarContatosRegistrados(
+        bridgeBaseUrl: _signalBridgeUrl,
+        contaTelefone: SignalCore().meuUserId,
+        aoProgredir: (verificados, total) {
+          if (!mounted) return;
+          setState(() {
+            _verificados = verificados;
+            _totalParaVerificar = total;
+          });
+        },
+      );
     });
   }
 
@@ -162,6 +177,10 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final buscaTemDigitos = RegExp(r'\d{3,}').hasMatch(_busca);
+    final buscaTemLetras = RegExp(r'[a-zA-Z]').hasMatch(_busca);
+    final buscando = _busca.isNotEmpty;
+
     return Scaffold(
       backgroundColor: kbackgroundColor,
       appBar: AppBar(
@@ -180,12 +199,18 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
               child: TextField(
                 controller: _buscaController,
                 style: const TextStyle(color: kTextColor),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
                   hintText: 'Nome, nome de usuário ou número',
-                  hintStyle: TextStyle(color: kTextDarkColor),
-                  prefixIcon: Icon(Icons.search, color: kTextDarkColor),
+                  hintStyle: const TextStyle(color: kTextDarkColor),
+                  prefixIcon: const Icon(Icons.search, color: kTextDarkColor),
+                  suffixIcon: buscando
+                      ? IconButton(
+                          icon: const Icon(Icons.close, color: kTextDarkColor),
+                          onPressed: () => _buscaController.clear(),
+                        )
+                      : null,
                 ),
               ),
             ),
@@ -195,7 +220,7 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
               future: _futureContatos,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return _buildCarregando();
                 }
 
                 if (snapshot.hasError) {
@@ -203,43 +228,41 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
                 }
 
                 final todos = snapshot.data ?? [];
+                final buscaMinuscula = _busca.toLowerCase();
                 final filtrados = _busca.isEmpty
                     ? todos
                     : todos
                         .where((c) =>
-                            c.nome.toLowerCase().contains(_busca) ||
+                            c.nome.toLowerCase().contains(buscaMinuscula) ||
                             c.telefoneRegistrado.contains(_busca))
                         .toList();
 
                 return ListView(
                   children: [
-                    _buildOpcao(
-                      icon: Icons.group,
-                      titulo: 'Novo grupo',
-                      onTap: () => _avisarIndisponivel(
-                        'Grupos ainda não estão disponíveis nesse fork.',
-                      ),
-                    ),
-                    _buildOpcao(
-                      icon: Icons.alternate_email,
-                      titulo: 'Encontrar pelo nome de usuário',
-                      onTap: _buscarPorUsername,
-                    ),
-                    _buildOpcao(
-                      icon: Icons.tag,
-                      titulo: 'Encontrar pelo número de telefone',
-                      onTap: _buscarPorNumero,
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 4.0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'A',
-                          style: TextStyle(color: kTextDarkColor, fontWeight: FontWeight.bold),
+                    // As opções fixas de topo (Novo grupo, buscar por
+                    // username/número em modal) só aparecem com a busca
+                    // vazia — igual ao Signal real, que troca esse menu
+                    // pelos resultados assim que você começa a digitar.
+                    if (!buscando) ...[
+                      _buildOpcao(
+                        icon: Icons.group,
+                        titulo: 'Novo grupo',
+                        onTap: () => _avisarIndisponivel(
+                          'Grupos ainda não estão disponíveis nesse fork.',
                         ),
                       ),
-                    ),
+                      _buildOpcao(
+                        icon: Icons.alternate_email,
+                        titulo: 'Encontrar pelo nome de usuário',
+                        onTap: _buscarPorUsername,
+                      ),
+                      _buildOpcao(
+                        icon: Icons.tag,
+                        titulo: 'Encontrar pelo número de telefone',
+                        onTap: _buscarPorNumero,
+                      ),
+                    ],
+                    _buildCabecalho('Contatos'),
                     ListTile(
                       leading: const CircleAvatar(
                         backgroundColor: kPrimaryColor,
@@ -248,7 +271,7 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
                       title: const Text('Anotações', style: TextStyle(color: kTextColor)),
                       onTap: () => _abrirChat(SignalCore().meuUserId),
                     ),
-                    const Divider(color: kDividerColor, height: 24.0),
+                    if (!buscando) const Divider(color: kDividerColor, height: 24.0),
                     ...filtrados.map(
                       (contato) => ListTile(
                         leading: CircleAvatar(
@@ -268,32 +291,65 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
                         onTap: () => _abrirChat(contato.telefoneRegistrado),
                       ),
                     ),
-                    if (filtrados.isEmpty && todos.isNotEmpty)
+                    if (buscando && filtrados.isEmpty && todos.isNotEmpty)
                       const Padding(
-                        padding: EdgeInsets.all(24.0),
-                        child: Text(
-                          'Nenhum contato encontrado pra essa busca.',
-                          style: TextStyle(color: kTextDarkColor),
+                        padding: EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 4.0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Nenhum contato da sua agenda bate com essa busca.',
+                            style: TextStyle(color: kTextDarkColor, fontSize: 12.0),
+                          ),
                         ),
                       ),
                     if (todos.isEmpty)
                       const Padding(
-                        padding: EdgeInsets.all(24.0),
-                        child: Text(
-                          'Nenhum contato da sua agenda está registrado no Signal ainda.',
-                          style: TextStyle(color: kTextDarkColor),
+                        padding: EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 4.0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Nenhum contato da sua agenda está registrado no Signal ainda.',
+                            style: TextStyle(color: kTextDarkColor, fontSize: 12.0),
+                          ),
                         ),
                       ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 4.0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Mais',
-                          style: TextStyle(color: kTextDarkColor, fontWeight: FontWeight.bold),
+
+                    // Linha de resultado ao vivo, igual ao Signal real: assim
+                    // que você digita algo com cara de número/username, some
+                    // uma opção pra buscar exatamente aquilo direto no
+                    // servidor — não fica dependendo só da agenda local.
+                    if (buscando && buscaTemDigitos) ...[
+                      _buildCabecalho('Encontrar pelo número de telefone'),
+                      ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: kchatBarMessage,
+                          child: Icon(Icons.search, color: kPrimaryColor),
                         ),
+                        title: Text(_busca, style: const TextStyle(color: kTextColor)),
+                        subtitle: const Text(
+                          'Toque para verificar no Signal',
+                          style: TextStyle(color: kTextDarkColor, fontSize: 12.0),
+                        ),
+                        onTap: () => _verificarEAbrir(_busca),
                       ),
-                    ),
+                    ],
+                    if (buscando && buscaTemLetras) ...[
+                      _buildCabecalho('Encontrar pelo nome de usuário'),
+                      ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: kchatBarMessage,
+                          child: Icon(Icons.alternate_email, color: kPrimaryColor),
+                        ),
+                        title: Text(_busca, style: const TextStyle(color: kTextColor)),
+                        subtitle: const Text(
+                          'Toque para verificar no Signal',
+                          style: TextStyle(color: kTextDarkColor, fontSize: 12.0),
+                        ),
+                        onTap: () => _verificarEAbrir(_busca, ehUsername: true),
+                      ),
+                    ],
+
+                    _buildCabecalho('Mais'),
                     _buildOpcao(
                       icon: Icons.refresh,
                       titulo: 'Atualizar contatos',
@@ -319,6 +375,19 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
     );
   }
 
+  Widget _buildCabecalho(String texto) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 4.0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          texto,
+          style: const TextStyle(color: kTextDarkColor, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
   Widget _buildOpcao({
     required IconData icon,
     required String titulo,
@@ -335,6 +404,28 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
           ? Text(subtitulo, style: const TextStyle(color: kTextDarkColor, fontSize: 12.0))
           : null,
       onTap: onTap,
+    );
+  }
+
+  // Verificar a agenda inteira contra o Signal (em lotes, pelo bridge) pode
+  // levar alguns segundos com muitos contatos — mostra progresso em vez de
+  // um spinner mudo, pra não parecer travado.
+  Widget _buildCarregando() {
+    final temProgresso = _totalParaVerificar > 0;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16.0),
+          Text(
+            temProgresso
+                ? 'Verificando contatos no Signal... ($_verificados/$_totalParaVerificar)'
+                : 'Carregando contatos...',
+            style: const TextStyle(color: kTextDarkColor),
+          ),
+        ],
+      ),
     );
   }
 
