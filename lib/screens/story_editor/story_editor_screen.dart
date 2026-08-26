@@ -160,7 +160,10 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
 
   Future<Uint8List> _renderizarPng() async {
     final boundary = _repaintKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-    final imagem = await boundary.toImage(pixelRatio: 2.0);
+    // pixelRatio mais baixo = PNG bem menor em base64. 2.0 gerava payloads
+    // grandes o suficiente pra estourar limite/timeout de proxy (Railway) e
+    // derrubar a conexão no meio do upload (ClientException: connection abort).
+    final imagem = await boundary.toImage(pixelRatio: 1.2);
     final byteData = await imagem.toByteData(format: ui.ImageByteFormat.png);
     return byteData!.buffer.asUint8List();
   }
@@ -231,7 +234,7 @@ class _StoryEditorScreenState extends State<StoryEditorScreen> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        if (_temFoto) Image.file(widget.imagemDeFundo!, fit: BoxFit.cover),
+                        if (_temFoto) Image.file(widget.imagemDeFundo!, fit: BoxFit.contain),
                         if (_temFoto)
                           Container(
                             decoration: const BoxDecoration(
