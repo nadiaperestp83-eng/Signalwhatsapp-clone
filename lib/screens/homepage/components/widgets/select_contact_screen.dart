@@ -16,7 +16,7 @@ class SelectContactScreen extends StatefulWidget {
   State<SelectContactScreen> createState() => _SelectContactScreenState();
 }
 
-class _SelectContactScreenState extends State<SelectContactScreen> {
+class _SelectContactScreenState extends State<SelectContactScreen> with WidgetsBindingObserver {
   late Future<List<ContatoSignal>> _futureContatos;
   final TextEditingController _buscaController = TextEditingController();
   String _busca = '';
@@ -27,10 +27,23 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _carregarContatos();
     _buscaController.addListener(() {
       setState(() => _busca = _buscaController.text.trim());
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Se o usuário saiu pra Ajustes do sistema pra ativar a permissão
+    // manualmente e voltou, o app não recebe nenhum aviso automático disso
+    // — sem isso, a tela ficaria presa mostrando "sem permissão" até o
+    // usuário tocar em "Tentar novamente" na mão. Com isso, reverifica
+    // sozinho assim que a tela volta a ficar em primeiro plano.
+    if (state == AppLifecycleState.resumed) {
+      _carregarContatos();
+    }
   }
 
   void _carregarContatos() {
@@ -53,6 +66,7 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _buscaController.dispose();
     super.dispose();
   }
@@ -453,10 +467,20 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
             const SizedBox(height: 16.0),
             ElevatedButton(
               onPressed: _carregarContatos,
-              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryColor,
+                foregroundColor: Colors.white, // sem isso, o M3 usa colorScheme.primary
+                // (mesma cor do fundo) como cor do texto — texto invisível.
+              ),
               child: const Text('Tentar novamente'),
             ),
             if (permissaoNegada) ...[
+              const SizedBox(height: 8.0),
+              OutlinedButton(
+                onPressed: SignalContactsService.abrirConfiguracoesDoApp,
+                style: OutlinedButton.styleFrom(foregroundColor: kPrimaryColor),
+                child: const Text('Abrir configurações do app'),
+              ),
               const SizedBox(height: 8.0),
               const Text(
                 'Se não aparecer o pedido de permissão, ative manualmente em '
