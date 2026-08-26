@@ -28,6 +28,11 @@ dependencies:
   # precisar empacotar .ttf em assets/fonts.
   google_fonts: ^6.2.1
 
+  # 🔐 Segunda fonte de verdade pra permissão de contatos (consulta o SO
+  # direto, não depende do cache interno do flutter_contacts) + abre a tela
+  # de configurações do app quando o usuário precisa ativar manualmente.
+  permission_handler: ^11.3.1
+
 flutter_launcher_icons:
   android: true
   ios: true
