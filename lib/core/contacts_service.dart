@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart' as ph;
 
 class ContatoSignal {
   final String nome;
@@ -143,6 +144,33 @@ class SignalContactsService {
     return resultado;
   }
 
+  /// Checa a permissão de contatos com DUAS fontes de verdade, não só uma:
+  ///
+  /// 1) FlutterContacts.requestPermission() — dispara o diálogo do sistema
+  ///    na primeira vez, mas mantém um cache interno que pode ficar
+  ///    desatualizado.
+  /// 2) permission_handler (Permission.contacts.status) — consulta o
+  ///    Android direto, sem cache do plugin. Cobre o caso comum: usuário
+  ///    negou uma vez, foi em Ajustes do sistema > Apps > Permissões e
+  ///    ativou manualmente, voltou pro app — o flutter_contacts nunca fica
+  ///    sabendo dessa mudança e continua dizendo "negado" mesmo com a
+  ///    permissão concedida de verdade no SO. Sem essa segunda checagem, a
+  ///    tela fica presa pedindo permissão pra sempre mesmo já concedida.
+  static Future<bool> _temPermissaoContatos() async {
+    final concedidaPeloFlutterContacts = await FlutterContacts.requestPermission();
+    if (concedidaPeloFlutterContacts) return true;
+
+    final statusReal = await ph.Permission.contacts.status;
+    return statusReal.isGranted;
+  }
+
+  /// Abre a tela de configurações do próprio app no Android/iOS, pro
+  /// usuário ativar a permissão manualmente quando o diálogo do sistema
+  /// não aparece mais (ex: já negou "não perguntar novamente").
+  static Future<void> abrirConfiguracoesDoApp() async {
+    await ph.openAppSettings();
+  }
+
   /// Cruza a agenda do celular com quem está REALMENTE registrado no Signal,
   /// perguntando direto pro bridge (signal-cli) — não mais pela tabela
   /// signal_bundles do Supabase, que só lista quem já abriu esse fork.
@@ -151,7 +179,7 @@ class SignalContactsService {
     required String contaTelefone,
     void Function(int verificados, int total)? aoProgredir,
   }) async {
-    final permitido = await FlutterContacts.requestPermission();
+    final permitido = await _temPermissaoContatos();
     if (!permitido) {
       throw StateError('Permissão de contatos negada.');
     }
