@@ -11,7 +11,7 @@ class ChatScreen extends StatelessWidget {
     final targetUserId = ModalRoute.of(context)?.settings.arguments as String? ?? '';
 
     return Scaffold(
-      appBar: chatScreenAppBar(),
+      appBar: chatScreenAppBar(targetUserId),
       body: ChatScreenBody(targetUserId: targetUserId),
     );
   }
