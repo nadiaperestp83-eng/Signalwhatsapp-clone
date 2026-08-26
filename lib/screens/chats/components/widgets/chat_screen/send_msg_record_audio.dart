@@ -4,10 +4,12 @@ import 'package:whatsapp_clone/core/signal_core.dart';
 
 class SendMessageAndRecordAudioWidget extends StatefulWidget {
   final String targetUserId;
+  final ValueChanged<String> onMensagemEnviada;
 
   const SendMessageAndRecordAudioWidget({
     super.key,
     required this.targetUserId,
+    required this.onMensagemEnviada,
   });
 
   @override
@@ -37,6 +39,7 @@ class _SendMessageAndRecordAudioWidgetState
 
     try {
       await SignalCore().enviarMensagemSegura(widget.targetUserId, texto);
+      widget.onMensagemEnviada(texto);
       _controller.clear();
     } catch (e) {
       if (mounted) {
