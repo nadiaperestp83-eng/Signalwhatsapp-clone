@@ -177,6 +177,37 @@ class SignalCore {
     _inicializado = false;
   }
 
+  // ===== Anotações (Notes to self) =====
+  //
+  // Diferente de mensagens pra outra pessoa: "Anotações" NÃO passa pela
+  // sessão criptográfica ponto-a-ponto. Antes, o botão de Anotações
+  // reaproveitava enviarMensagemSegura() mandando pra mim mesmo, e isso
+  // tentava montar uma sessão Signal Protocol consigo mesmo — consumindo
+  // uma one-time-prekey da própria conta e cruzando a identidade com ela
+  // mesma. Frágil e não é assim que o Signal real faz (lá é sync message
+  // entre dispositivos vinculados, não uma sessão par-a-par normal). Aqui,
+  // como só temos um dispositivo por conta, tratamos como bloco de notas
+  // local puro — sem rede, sem Supabase, sem sessão.
+  String get _chaveAnotacoes => 'anotacoes_$_meuUserId';
+
+  Future<List<Map<String, dynamic>>> carregarAnotacoes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bruto = prefs.getString(_chaveAnotacoes);
+    if (bruto == null) return [];
+    final lista = jsonDecode(bruto) as List<dynamic>;
+    return lista.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> salvarAnotacao(String texto) async {
+    final prefs = await SharedPreferences.getInstance();
+    final atuais = await carregarAnotacoes();
+    atuais.add({
+      'texto': texto,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+    await prefs.setString(_chaveAnotacoes, jsonEncode(atuais));
+  }
+
   /// Chame quando o app volta do segundo plano — o Android mata o WebSocket
   /// quando o app fica em background, então isso reconecta o canal ao vivo
   /// E busca mensagens que chegaram enquanto o app estava desconectado
