@@ -1,67 +1,52 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:whatsapp_clone/models/messages.dart';
-import 'package:whatsapp_clone/core/signal_core.dart';
 import 'package:whatsapp_clone/screens/chats/components/widgets/messages/receiver_message_bubble.dart';
 import 'package:whatsapp_clone/screens/chats/components/widgets/messages/sender_message_bubble.dart';
 
-class ChatScreenMessagesWidget extends StatefulWidget {
-  final String targetUserId;
+// Antes era StatefulWidget dono da lista de mensagens, e começava com
+// List.from(inboxMessages) — uma conversa fake fixa ("Hey handsome 🥰🥰")
+// que aparecia em QUALQUER chat, não importa com quem. Agora é
+// StatelessWidget: só exibe a lista que o ChatScreenBody controla.
+//
+// Nota: ainda não persiste histórico entre sessões — reabrir a conversa
+// depois de fechar o app não traz mensagens antigas de volta, porque não
+// existe camada de persistência de mensagens por contato ainda (só o
+// resumo/última mensagem usado na lista de conversas). É feature separada,
+// avisa se quiser que eu implemente.
+class ChatScreenMessagesWidget extends StatelessWidget {
+  final List<Map<String, dynamic>> mensagens;
 
   const ChatScreenMessagesWidget({
     super.key,
-    required this.targetUserId,
+    required this.mensagens,
   });
 
   @override
-  State<ChatScreenMessagesWidget> createState() =>
-      _ChatScreenMessagesWidgetState();
-}
-
-class _ChatScreenMessagesWidgetState extends State<ChatScreenMessagesWidget> {
-  late final List<Map<String, dynamic>> _mensagens;
-  late final StreamSubscription<MensagemDescriptografada> _sub;
-
-  @override
-  void initState() {
-    super.initState();
-    // Mantém o mock inicial (opcional — pode trocar por [] se preferir começar vazio)
-    _mensagens = List<Map<String, dynamic>>.from(inboxMessages);
-
-    _sub = SignalCore().mensagensRecebidas.listen((msg) {
-      if (msg.remetente != widget.targetUserId) return;
-      setState(() {
-        _mensagens.add({
-          'isSender': false,
-          'message': msg.texto,
-          'timeStamp':
-              '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-        });
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    if (mensagens.isEmpty) {
+      return const Expanded(
+        child: Center(
+          child: Text(
+            'Nenhuma mensagem ainda. Diga oi!',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+    }
+
     return Expanded(
       child: ListView.builder(
-        itemCount: _mensagens.length,
+        itemCount: mensagens.length,
         itemBuilder: (context, index) {
-          if (_mensagens[index]['isSender'] == false) {
+          final msg = mensagens[index];
+          if (msg['isSender'] == false) {
             return ReceiverMessageBubble(
-              message: _mensagens[index]['message'],
-              timeStamp: _mensagens[index]['timeStamp'],
+              message: msg['message'],
+              timeStamp: msg['timeStamp'],
             );
           }
           return SenderMessageBubble(
-            message: _mensagens[index]['message'],
-            timeStamp: _mensagens[index]['timeStamp'],
+            message: msg['message'],
+            timeStamp: msg['timeStamp'],
           );
         },
       ),
