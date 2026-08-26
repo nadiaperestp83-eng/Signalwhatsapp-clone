@@ -13,7 +13,10 @@ const String _signalBridgeUrl = String.fromEnvironment('SIGNAL_BRIDGE_URL');
 
 /// Cores de fundo disponíveis pra uma story de texto puro (sem foto).
 const List<Color> _kStoryBackgroundColors = [
-  Color(0xFF1F2C34),
+  kAppBarColor, // era Color(0xFF1F2C34) fixo — duplicava o valor antigo do
+  // kAppBarColor. Trocado pra referenciar a constante, então acompanha o
+  // tema automaticamente (antes era o "fundo escuro"; no tema light agora é
+  // branco).
   kPrimaryColor,
   Color(0xFF6A3DE8),
   Color(0xFFE84393),
