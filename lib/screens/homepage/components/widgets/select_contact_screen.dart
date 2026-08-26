@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:whatsapp_clone/constants/colors.dart';
 import 'package:whatsapp_clone/core/contacts_service.dart';
 import 'package:whatsapp_clone/core/signal_core.dart';
+import 'package:whatsapp_clone/core/signal_user_lookup_service.dart';
 import 'package:whatsapp_clone/screens/chats/chat_screen.dart';
+
+const String _signalBridgeUrl = String.fromEnvironment('SIGNAL_BRIDGE_URL');
 
 class SelectContactScreen extends StatefulWidget {
   static String routeName = '/select-contact';
@@ -81,8 +84,79 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
       ),
     );
 
-    if (numero != null && numero.isNotEmpty && mounted) {
-      _abrirChat(numero);
+    if (numero == null || numero.isEmpty || !mounted) return;
+    await _verificarEAbrir(numero);
+  }
+
+  Future<void> _buscarPorUsername() async {
+    final usernameController = TextEditingController();
+
+    final username = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kAppBarColor,
+        title: const Text('Encontrar pelo nome de usuário', style: TextStyle(color: kTextColor)),
+        content: TextField(
+          controller: usernameController,
+          autofocus: true,
+          style: const TextStyle(color: kTextColor),
+          decoration: const InputDecoration(
+            hintText: 'usuario.123',
+            hintStyle: TextStyle(color: kTextDarkColor),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, usernameController.text.trim()),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+
+    if (username == null || username.isEmpty || !mounted) return;
+    await _verificarEAbrir(username, ehUsername: true);
+  }
+
+  Future<void> _verificarEAbrir(String recipient, {bool ehUsername = false}) async {
+    _avisarIndisponivel('Verificando no Signal...');
+
+    try {
+      final service = SignalUserLookupService(bridgeBaseUrl: _signalBridgeUrl);
+      final resultado = await service.verificarStatus(
+        telefoneConta: SignalCore().meuUserId,
+        recipient: recipient,
+      );
+
+      if (resultado['registrado'] != true) {
+        _avisarIndisponivel(
+          'Esse ${ehUsername ? "nome de usuário" : "número"} não está registrado no Signal.',
+        );
+        return;
+      }
+
+      if (ehUsername) {
+        // Usernames existem justamente pra NÃO expor o número de telefone.
+        // Nossa criptografia (signal_bundles no Supabase) é indexada por
+        // número, não por username/uuid — sem o número, não dá pra montar
+        // sessão. É limitação de arquitetura, não bug — deixando isso
+        // explícito em vez de fingir que funciona.
+        _avisarIndisponivel(
+          'Esse username existe no Signal, mas esse fork ainda só consegue '
+          'abrir chat por número de telefone (a criptografia é indexada por '
+          'número). Peça o número da pessoa por enquanto.',
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      _abrirChat(recipient);
+    } catch (e) {
+      _avisarIndisponivel('Não foi possível verificar: $e');
     }
   }
 
@@ -149,9 +223,7 @@ class _SelectContactScreenState extends State<SelectContactScreen> {
                     _buildOpcao(
                       icon: Icons.alternate_email,
                       titulo: 'Encontrar pelo nome de usuário',
-                      onTap: () => _avisarIndisponivel(
-                        'Busca por nome de usuário ainda não implementada.',
-                      ),
+                      onTap: _buscarPorUsername,
                     ),
                     _buildOpcao(
                       icon: Icons.tag,
