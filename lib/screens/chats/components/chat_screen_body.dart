@@ -17,31 +17,49 @@ class ChatScreenBody extends StatefulWidget {
 }
 
 class _ChatScreenBodyState extends State<ChatScreenBody> {
-  // Estado da conversa mora aqui agora (era todo dentro de
-  // ChatScreenMessagesWidget antes, e a mensagem que VOCÊ manda nunca
-  // chegava até essa lista — só o que chegava pelo SignalCore).
   final List<Map<String, dynamic>> _mensagens = [];
-  late final StreamSubscription<MensagemDescriptografada> _sub;
+  StreamSubscription<MensagemDescriptografada>? _sub;
+
+  // "Anotações" (chat consigo mesmo) não usa a sessão criptográfica
+  // ponto-a-ponto — ver SignalCore.salvarAnotacao/carregarAnotacoes.
+  bool get _ehAnotacoes =>
+      widget.targetUserId.isNotEmpty && widget.targetUserId == SignalCore().meuUserId;
 
   @override
   void initState() {
     super.initState();
-    _sub = SignalCore().mensagensRecebidas.listen((msg) {
-      if (msg.remetente != widget.targetUserId) return;
-      setState(() {
-        _mensagens.add({
-          'isSender': false,
-          'message': msg.texto,
-          'timeStamp': _formatarHora(msg.timestamp),
+    if (_ehAnotacoes) {
+      _carregarAnotacoesSalvas();
+    } else {
+      _sub = SignalCore().mensagensRecebidas.listen((msg) {
+        if (msg.remetente != widget.targetUserId) return;
+        setState(() {
+          _mensagens.add({
+            'isSender': false,
+            'message': msg.texto,
+            'timeStamp': _formatarHora(msg.timestamp),
+          });
         });
       });
+    }
+  }
+
+  Future<void> _carregarAnotacoesSalvas() async {
+    final anotacoes = await SignalCore().carregarAnotacoes();
+    if (!mounted) return;
+    setState(() {
+      _mensagens.addAll(anotacoes.map((a) => {
+            'isSender': true,
+            'message': a['texto'],
+            'timeStamp': _formatarHora(DateTime.parse(a['timestamp'] as String)),
+          }));
     });
   }
 
   String _formatarHora(DateTime dt) =>
       '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
-  void _adicionarMensagemEnviada(String texto) {
+  void _adicionarMensagemNaTela(String texto) {
     setState(() {
       _mensagens.add({
         'isSender': true,
@@ -51,9 +69,18 @@ class _ChatScreenBodyState extends State<ChatScreenBody> {
     });
   }
 
+  Future<void> _enviar(String texto) async {
+    if (_ehAnotacoes) {
+      await SignalCore().salvarAnotacao(texto);
+    } else {
+      await SignalCore().enviarMensagemSegura(widget.targetUserId, texto);
+    }
+    _adicionarMensagemNaTela(texto);
+  }
+
   @override
   void dispose() {
-    _sub.cancel();
+    _sub?.cancel();
     super.dispose();
   }
 
@@ -70,10 +97,7 @@ class _ChatScreenBodyState extends State<ChatScreenBody> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           ChatScreenMessagesWidget(mensagens: _mensagens),
-          SendMessageAndRecordAudioWidget(
-            targetUserId: widget.targetUserId,
-            onMensagemEnviada: _adicionarMensagemEnviada,
-          ),
+          SendMessageAndRecordAudioWidget(onEnviar: _enviar),
         ],
       ),
     );
