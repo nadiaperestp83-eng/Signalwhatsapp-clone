@@ -164,6 +164,16 @@ class SignalContactsService {
     return statusReal.isGranted;
   }
 
+  /// Devolve um texto de diagnóstico com as DUAS fontes de permissão lado a
+  /// lado — pra debugar ao vivo quando a tela trava sem dar pra saber por
+  /// quê. Não decide nada sozinho, só relata o que cada plugin está vendo.
+  static Future<String> diagnosticoPermissao() async {
+    final statusPermissionHandler = await ph.Permission.contacts.status;
+    final concedidaFlutterContacts = await FlutterContacts.requestPermission();
+    return 'permission_handler=$statusPermissionHandler | '
+        'flutter_contacts=$concedidaFlutterContacts';
+  }
+
   /// Abre a tela de configurações do próprio app no Android/iOS, pro
   /// usuário ativar a permissão manualmente quando o diálogo do sistema
   /// não aparece mais (ex: já negou "não perguntar novamente").
