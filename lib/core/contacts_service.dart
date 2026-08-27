@@ -191,22 +191,22 @@ class SignalContactsService {
       throw StateError('Permissão de contatos negada.');
     }
 
-    // Timeout defensivo: o permission_handler já confirmou que a permissão
-    // está concedida (log real: permission_handler=granted), então
-    // Android/ContentResolver não deveria bloquear essa leitura. Se mesmo
-    // assim travar, é bug interno do plugin flutter_contacts nesse
-    // aparelho — aqui isso vira um ERRO CLARO em 12s em vez de spinner
-    // girando pra sempre (foi exatamente o que aconteceu no log: "DIAG-v1"
-    // ficou 1 minuto+ preso em "Carregando contatos...").
+    // "Contatos — Acessado nas últimas 24 horas" no Android confirma que a
+    // leitura JÁ funcionou antes — não é bug de permissão nem deadlock do
+    // plugin. É `withPhoto: true` buscando a foto de TODA a agenda de uma
+    // vez, que é pesado e lento (conhecido no flutter_contacts com agendas
+    // grandes). Corrigido: primeiro lê só nome+número (rápido), cruza com
+    // o Signal, e a foto é buscada DEPOIS só pros contatos que realmente
+    // batem (um punhado, não a agenda inteira).
     final contatosDispositivo = await FlutterContacts.getContacts(
       withProperties: true,
-      withPhoto: true,
+      withPhoto: false,
     ).timeout(
-      const Duration(seconds: 12),
+      const Duration(seconds: 20),
       onTimeout: () => throw StateError(
-        'A leitura da agenda travou (permissão está concedida, mas o '
-        'plugin flutter_contacts não respondeu em 12s — bug conhecido em '
-        'alguns aparelhos Android/MIUI). Tente novamente; se persistir, '
+        'A leitura da agenda (só nomes/números, sem fotos) travou em 20s. '
+        'Sem a foto pesando, isso indica bug do plugin flutter_contacts '
+        'nesse aparelho mesmo, não lentidão. Tente novamente; se persistir, '
         'reinicie o app.',
       ),
     );
@@ -245,19 +245,40 @@ class SignalContactsService {
 
     final resultado = <ContatoSignal>[];
 
-    numerosPorContato.forEach((idx, numeros) {
+    // Antes era `.forEach` (síncrono). Virou `for` porque agora busca a
+    // foto individual de cada contato que bate — precisa de `await` dentro
+    // do loop, e forEach não segura async direito (o await dentro dele
+    // roda "solto", sem o loop esperar).
+    for (final entry in numerosPorContato.entries) {
+      final idx = entry.key;
+      final numeros = entry.value;
+
       for (final numero in numeros) {
         if (registrados[numero] == true) {
-          final contato = contatosDispositivo[idx];
+          final contatoBasico = contatosDispositivo[idx];
+
+          Uint8List? foto;
+          try {
+            final completo = await FlutterContacts.getContact(
+              contatoBasico.id,
+              withPhoto: true,
+            );
+            foto = completo?.photo;
+          } catch (_) {
+            // Sem foto não é motivo pra derrubar o contato inteiro da
+            // lista — só mostra sem avatar.
+            foto = null;
+          }
+
           resultado.add(ContatoSignal(
-            nome: contato.displayName,
-            foto: contato.photo,
+            nome: contatoBasico.displayName,
+            foto: foto,
             telefoneRegistrado: numero,
           ));
           break; // um match já basta pra esse contato
         }
       }
-    });
+    }
 
     resultado.sort((a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()));
     return resultado;
