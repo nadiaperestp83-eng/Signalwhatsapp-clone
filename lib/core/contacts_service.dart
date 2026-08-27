@@ -144,24 +144,21 @@ class SignalContactsService {
     return resultado;
   }
 
-  /// Checa a permissão de contatos com DUAS fontes de verdade, não só uma:
+  /// Checa a permissão de contatos usando SÓ o permission_handler.
   ///
-  /// 1) FlutterContacts.requestPermission() — dispara o diálogo do sistema
-  ///    na primeira vez, mas mantém um cache interno que pode ficar
-  ///    desatualizado.
-  /// 2) permission_handler (Permission.contacts.status) — consulta o
-  ///    Android direto, sem cache do plugin. Cobre o caso comum: usuário
-  ///    negou uma vez, foi em Ajustes do sistema > Apps > Permissões e
-  ///    ativou manualmente, voltou pro app — o flutter_contacts nunca fica
-  ///    sabendo dessa mudança e continua dizendo "negado" mesmo com a
-  ///    permissão concedida de verdade no SO. Sem essa segunda checagem, a
-  ///    tela fica presa pedindo permissão pra sempre mesmo já concedida.
+  /// Log real coletado (DIAG-v1): permission_handler=granted (confirmado
+  /// também nas Configurações do Android) mas flutter_contacts=false — ou
+  /// seja, o FlutterContacts.requestPermission() está MENTINDO nesse
+  /// aparelho (bug conhecido do plugin em alguns Android/MIUI, onde o
+  /// callback nativo de permissão não dispara direito). Por isso ele foi
+  /// removido da checagem: permission_handler consulta o Android direto,
+  /// sem depender do estado interno (quebrado) do flutter_contacts.
   static Future<bool> _temPermissaoContatos() async {
-    final concedidaPeloFlutterContacts = await FlutterContacts.requestPermission();
-    if (concedidaPeloFlutterContacts) return true;
+    var status = await ph.Permission.contacts.status;
+    if (status.isGranted) return true;
 
-    final statusReal = await ph.Permission.contacts.status;
-    return statusReal.isGranted;
+    status = await ph.Permission.contacts.request();
+    return status.isGranted;
   }
 
   /// Devolve um texto de diagnóstico com as DUAS fontes de permissão lado a
@@ -194,9 +191,24 @@ class SignalContactsService {
       throw StateError('Permissão de contatos negada.');
     }
 
+    // Timeout defensivo: o permission_handler já confirmou que a permissão
+    // está concedida (log real: permission_handler=granted), então
+    // Android/ContentResolver não deveria bloquear essa leitura. Se mesmo
+    // assim travar, é bug interno do plugin flutter_contacts nesse
+    // aparelho — aqui isso vira um ERRO CLARO em 12s em vez de spinner
+    // girando pra sempre (foi exatamente o que aconteceu no log: "DIAG-v1"
+    // ficou 1 minuto+ preso em "Carregando contatos...").
     final contatosDispositivo = await FlutterContacts.getContacts(
       withProperties: true,
       withPhoto: true,
+    ).timeout(
+      const Duration(seconds: 12),
+      onTimeout: () => throw StateError(
+        'A leitura da agenda travou (permissão está concedida, mas o '
+        'plugin flutter_contacts não respondeu em 12s — bug conhecido em '
+        'alguns aparelhos Android/MIUI). Tente novamente; se persistir, '
+        'reinicie o app.',
+      ),
     );
 
     final ddiPadrao = _extrairDdiDaConta(contaTelefone);
