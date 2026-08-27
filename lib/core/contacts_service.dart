@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart' as ph;
+import 'package:whatsapp_clone/core/native_contacts_service.dart';
 
 class ContatoSignal {
   final String nome;
-  final Uint8List? foto;
+  final Uint8List? foto; // sempre null por enquanto — ver nota em buscarContatosRegistrados
   final String telefoneRegistrado;
 
   ContatoSignal({
@@ -97,6 +97,37 @@ class SignalContactsService {
     return '+$ddiPadrao$nacional';
   }
 
+  /// Checa a permissão de contatos usando SÓ o permission_handler.
+  ///
+  /// O flutter_contacts foi removido de vez desse arquivo — não só da
+  /// checagem de permissão, mas também da leitura da agenda (ver
+  /// buscarContatosRegistrados). Log real coletado (DIAG-v1) mostrou o
+  /// plugin mentindo sobre o status de permissão, e depois travando a
+  /// leitura até o Android matar o app (ANR) mesmo com <100 contatos e
+  /// permissão genuinamente concedida. permission_handler continua sendo
+  /// usado só pra checagem — isso nunca deu problema.
+  static Future<bool> _temPermissaoContatos() async {
+    var status = await ph.Permission.contacts.status;
+    if (status.isGranted) return true;
+
+    status = await ph.Permission.contacts.request();
+    return status.isGranted;
+  }
+
+  /// Devolve um texto de diagnóstico com o status real da permissão — pra
+  /// debugar ao vivo quando a tela travar sem dar pra saber por quê.
+  static Future<String> diagnosticoPermissao() async {
+    final status = await ph.Permission.contacts.status;
+    return 'permission_handler=$status (leitura 100% nativa agora, sem flutter_contacts)';
+  }
+
+  /// Abre a tela de configurações do próprio app no Android/iOS, pro
+  /// usuário ativar a permissão manualmente quando o diálogo do sistema
+  /// não aparece mais (ex: já negou "não perguntar novamente").
+  static Future<void> abrirConfiguracoesDoApp() async {
+    await ph.openAppSettings();
+  }
+
   /// Verifica no bridge (signal-cli), em lotes, quais números da lista estão
   /// registrados de verdade no Signal. Sequencial (nunca em paralelo) porque
   /// o signal-cli trava a config da conta por lockfile — chamadas
@@ -144,43 +175,14 @@ class SignalContactsService {
     return resultado;
   }
 
-  /// Checa a permissão de contatos usando SÓ o permission_handler.
+  /// Cruza a agenda do celular com quem está REALMENTE registrado no Signal.
   ///
-  /// Log real coletado (DIAG-v1): permission_handler=granted (confirmado
-  /// também nas Configurações do Android) mas flutter_contacts=false — ou
-  /// seja, o FlutterContacts.requestPermission() está MENTINDO nesse
-  /// aparelho (bug conhecido do plugin em alguns Android/MIUI, onde o
-  /// callback nativo de permissão não dispara direito). Por isso ele foi
-  /// removido da checagem: permission_handler consulta o Android direto,
-  /// sem depender do estado interno (quebrado) do flutter_contacts.
-  static Future<bool> _temPermissaoContatos() async {
-    var status = await ph.Permission.contacts.status;
-    if (status.isGranted) return true;
-
-    status = await ph.Permission.contacts.request();
-    return status.isGranted;
-  }
-
-  /// Devolve um texto de diagnóstico com as DUAS fontes de permissão lado a
-  /// lado — pra debugar ao vivo quando a tela trava sem dar pra saber por
-  /// quê. Não decide nada sozinho, só relata o que cada plugin está vendo.
-  static Future<String> diagnosticoPermissao() async {
-    final statusPermissionHandler = await ph.Permission.contacts.status;
-    final concedidaFlutterContacts = await FlutterContacts.requestPermission();
-    return 'permission_handler=$statusPermissionHandler | '
-        'flutter_contacts=$concedidaFlutterContacts';
-  }
-
-  /// Abre a tela de configurações do próprio app no Android/iOS, pro
-  /// usuário ativar a permissão manualmente quando o diálogo do sistema
-  /// não aparece mais (ex: já negou "não perguntar novamente").
-  static Future<void> abrirConfiguracoesDoApp() async {
-    await ph.openAppSettings();
-  }
-
-  /// Cruza a agenda do celular com quem está REALMENTE registrado no Signal,
-  /// perguntando direto pro bridge (signal-cli) — não mais pela tabela
-  /// signal_bundles do Supabase, que só lista quem já abriu esse fork.
+  /// A leitura da agenda agora é 100% nativa (NativeContactsService, via
+  /// ContentResolver direto), não passa mais pelo flutter_contacts em
+  /// nenhum ponto — plugin removido de vez desse fluxo depois de ANR
+  /// confirmado em teste real. Sem foto por enquanto (a leitura nativa só
+  /// traz nome + número); dá pra adicionar foto depois com outra consulta
+  /// nativa se fizer falta.
   static Future<List<ContatoSignal>> buscarContatosRegistrados({
     required String bridgeBaseUrl,
     required String contaTelefone,
@@ -191,45 +193,28 @@ class SignalContactsService {
       throw StateError('Permissão de contatos negada.');
     }
 
-    // "Contatos — Acessado nas últimas 24 horas" no Android confirma que a
-    // leitura JÁ funcionou antes — não é bug de permissão nem deadlock do
-    // plugin. É `withPhoto: true` buscando a foto de TODA a agenda de uma
-    // vez, que é pesado e lento (conhecido no flutter_contacts com agendas
-    // grandes). Corrigido: primeiro lê só nome+número (rápido), cruza com
-    // o Signal, e a foto é buscada DEPOIS só pros contatos que realmente
-    // batem (um punhado, não a agenda inteira).
-    final contatosDispositivo = await FlutterContacts.getContacts(
-      withProperties: true,
-      withPhoto: false,
-    ).timeout(
-      const Duration(seconds: 20),
+    final contatosDispositivo = await NativeContactsService.listarContatos().timeout(
+      const Duration(seconds: 15),
       onTimeout: () => throw StateError(
-        'A leitura da agenda (só nomes/números, sem fotos) travou em 20s. '
-        'Sem a foto pesando, isso indica bug do plugin flutter_contacts '
-        'nesse aparelho mesmo, não lentidão. Tente novamente; se persistir, '
-        'reinicie o app.',
+        'A leitura nativa da agenda travou em 15s. Essa consulta já não '
+        'depende mais do flutter_contacts — se travar aqui também, o '
+        'problema não é mais de plugin, é outra coisa (ex: permissão '
+        'bloqueada em nível de sistema, ou muitos contatos duplicados).',
       ),
     );
 
     final ddiPadrao = _extrairDdiDaConta(contaTelefone);
 
-    // contato -> lista de (número normalizado) pra tentar, na ordem em que
-    // aparecem na agenda.
-    final numerosPorContato = <int, List<String>>{};
+    // numero E.164 -> nome (um por linha, já que a consulta nativa devolve
+    // uma linha por número de telefone, não por "pessoa").
+    final candidatos = <MapEntry<String, String>>[];
     final todosNumerosUnicos = <String>{};
 
-    for (var idx = 0; idx < contatosDispositivo.length; idx++) {
-      final normalizados = <String>[];
-      for (final telefone in contatosDispositivo[idx].phones) {
-        final normalizado = _normalizarParaE164(telefone.number, ddiPadrao);
-        if (normalizado != null) {
-          normalizados.add(normalizado);
-          todosNumerosUnicos.add(normalizado);
-        }
-      }
-      if (normalizados.isNotEmpty) {
-        numerosPorContato[idx] = normalizados;
-      }
+    for (final contato in contatosDispositivo) {
+      final normalizado = _normalizarParaE164(contato.numero, ddiPadrao);
+      if (normalizado == null) continue;
+      candidatos.add(MapEntry(normalizado, contato.nome));
+      todosNumerosUnicos.add(normalizado);
     }
 
     if (todosNumerosUnicos.isEmpty) {
@@ -244,39 +229,20 @@ class SignalContactsService {
     );
 
     final resultado = <ContatoSignal>[];
+    final jaAdicionado = <String>{};
 
-    // Antes era `.forEach` (síncrono). Virou `for` porque agora busca a
-    // foto individual de cada contato que bate — precisa de `await` dentro
-    // do loop, e forEach não segura async direito (o await dentro dele
-    // roda "solto", sem o loop esperar).
-    for (final entry in numerosPorContato.entries) {
-      final idx = entry.key;
-      final numeros = entry.value;
+    for (final candidato in candidatos) {
+      final numero = candidato.key;
+      final nome = candidato.value;
+      final chave = '$nome|$numero';
 
-      for (final numero in numeros) {
-        if (registrados[numero] == true) {
-          final contatoBasico = contatosDispositivo[idx];
-
-          Uint8List? foto;
-          try {
-            final completo = await FlutterContacts.getContact(
-              contatoBasico.id,
-              withPhoto: true,
-            );
-            foto = completo?.photo;
-          } catch (_) {
-            // Sem foto não é motivo pra derrubar o contato inteiro da
-            // lista — só mostra sem avatar.
-            foto = null;
-          }
-
-          resultado.add(ContatoSignal(
-            nome: contatoBasico.displayName,
-            foto: foto,
-            telefoneRegistrado: numero,
-          ));
-          break; // um match já basta pra esse contato
-        }
+      if (registrados[numero] == true && !jaAdicionado.contains(chave)) {
+        resultado.add(ContatoSignal(
+          nome: nome.isEmpty ? numero : nome,
+          foto: null,
+          telefoneRegistrado: numero,
+        ));
+        jaAdicionado.add(chave);
       }
     }
 
