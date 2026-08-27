@@ -23,6 +23,7 @@ class _SelectContactScreenState extends State<SelectContactScreen> with WidgetsB
 
   int _verificados = 0;
   int _totalParaVerificar = 0;
+  String _diagnostico = '';
 
   @override
   void initState() {
@@ -60,6 +61,27 @@ class _SelectContactScreenState extends State<SelectContactScreen> with WidgetsB
             _totalParaVerificar = total;
           });
         },
+      );
+    });
+    _atualizarDiagnostico();
+  }
+
+  // DIAG-v1: aviso fixo (não some sozinho, ao contrário de SnackBar) com o
+  // status real das duas fontes de permissão. Objetivo é parar de adivinhar
+  // e ver o dado exato na tela quando algo trava.
+  Future<void> _atualizarDiagnostico() async {
+    final texto = await SignalContactsService.diagnosticoPermissao();
+    if (!mounted) return;
+    setState(() => _diagnostico = 'DIAG-v1 | $texto');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_diagnostico),
+          duration: const Duration(seconds: 6),
+          backgroundColor: Colors.black87,
+        ),
       );
     });
   }
@@ -229,6 +251,20 @@ class _SelectContactScreenState extends State<SelectContactScreen> with WidgetsB
               ),
             ),
           ),
+          if (_diagnostico.isNotEmpty)
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFFFCC00),
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              child: Text(
+                _diagnostico,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.0,
+                ),
+              ),
+            ),
           Expanded(
             child: FutureBuilder<List<ContatoSignal>>(
               future: _futureContatos,
